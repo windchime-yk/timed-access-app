@@ -8,14 +8,33 @@ import {
 } from "./datetime.ts";
 import * as styles from "./styles.ts";
 
+const Toast = (
+  { kind, message }: { kind: "notice" | "error"; message: string },
+) => (
+  <div
+    class={cx(
+      styles.banner,
+      kind === "notice" ? styles.bannerNotice : styles.bannerError,
+    )}
+    data-toast
+    role={kind === "error" ? "alert" : "status"}
+  >
+    <span>{message}</span>
+    <button
+      type="button"
+      class={styles.toastClose}
+      data-dismiss
+      aria-label="閉じる"
+    >
+      ×
+    </button>
+  </div>
+);
+
 const Banners = ({ notice, error }: { notice?: string; error?: string }) => (
   <>
-    {notice
-      ? <p class={cx(styles.banner, styles.bannerNotice)}>{notice}</p>
-      : null}
-    {error
-      ? <p class={cx(styles.banner, styles.bannerError)}>{error}</p>
-      : null}
+    {notice ? <Toast kind="notice" message={notice} /> : null}
+    {error ? <Toast kind="error" message={error} /> : null}
   </>
 );
 
@@ -65,7 +84,7 @@ const TokenTable = ({ tokens }: { tokens: TokenRecord[] }) => {
                 <form
                   method="post"
                   action={`/tokens/${token.id}/delete`}
-                  onsubmit="return confirm('このトークンを失効させますか？')"
+                  data-confirm={`トークン「${token.name}」を失効させますか？`}
                 >
                   <button
                     type="submit"
@@ -105,7 +124,7 @@ export const IndexPage = ({ tokens, notice, error }: IndexPageProps) => (
             type="datetime-local"
             name="expires_at"
             required
-            min={toDatetimeLocal(new Date().toISOString())}
+            min={toDatetimeLocal(new Date())}
           />
         </label>
         <button type="submit" class={cx(styles.button, styles.buttonPrimary)}>
@@ -148,7 +167,7 @@ export const EditPage = ({ token, error }: EditPageProps) => (
             name="expires_at"
             required
             value={toDatetimeLocal(token.expiresAt)}
-            min={toDatetimeLocal(new Date().toISOString())}
+            min={toDatetimeLocal(new Date())}
           />
         </label>
         <div class={styles.actions}>

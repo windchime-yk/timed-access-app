@@ -122,6 +122,28 @@ Deno.test("update: 表示名と失効日時を更新し、失効済みには適�
     assertEquals(await store.update(expired.id, { name: "無効" }), null);
   }));
 
+Deno.test("update: nameの未指定は維持、空文字は既定名にリセットする", () =>
+  withStore(async (store) => {
+    const token = await store.create({
+      name: "元の名前",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    // name未指定 → 維持（失効日時だけ更新）
+    const kept = await store.update(token.id, {
+      expiresAt: new Date(Date.now() + 120_000),
+    });
+    assertEquals(kept?.name, "元の名前");
+
+    // name="" → 既定名にリセット（createと同じ扱い）
+    const reset = await store.update(token.id, { name: "" });
+    assertEquals(reset?.name, "無題のトークン");
+
+    // 空白のみも既定名にリセット
+    const resetBlank = await store.update(token.id, { name: "   " });
+    assertEquals(resetBlank?.name, "無題のトークン");
+  }));
+
 Deno.test("update: 過去の失効日時には更新できない", () =>
   withStore(async (store) => {
     const token = await store.create({

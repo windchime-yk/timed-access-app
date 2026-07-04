@@ -90,9 +90,28 @@ export const card = css`
 `;
 
 export const banner = css`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
+`;
+
+export const toastClose = css`
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  cursor: pointer;
+  opacity: 0.7;
+  &:hover {
+    opacity: 1;
+  }
 `;
 
 export const bannerNotice = css`
@@ -214,4 +233,26 @@ export const statusValid = css`
 
 export const statusInvalid = css`
   color: var(--danger);
+`;
+
+export const dialog = css`
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  color: var(--text);
+  max-width: 26rem;
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+  }
+  p {
+    margin: 0 0 1rem;
+  }
+  menu {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin: 0;
+    padding: 0;
+  }
 `;

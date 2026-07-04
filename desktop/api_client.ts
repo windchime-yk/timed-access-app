@@ -31,7 +31,10 @@ export class ApiClient {
   async #request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let res: Response;
     try {
-      res = await fetch(new URL(path, this.#baseUrl), {
+      // baseUrlのパス接頭辞を保つため、絶対パス解決になるnew URL(path, base)ではなく
+      // 末尾スラッシュを除いたbaseへ直接結合する（例: .../timed-access + /tokens）
+      const url = this.#baseUrl.replace(/\/+$/, "") + path;
+      res = await fetch(url, {
         ...init,
         headers: {
           [API_KEY_HEADER]: this.#apiKey,

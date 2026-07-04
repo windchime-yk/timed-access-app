@@ -98,7 +98,10 @@ export class TokenStore {
 
     const updated: TokenRecord = {
       ...current,
-      name: patch.name?.trim() || current.name,
+      // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
+      name: patch.name === undefined
+        ? current.name
+        : patch.name.trim() || DEFAULT_NAME,
       expiresAt: expiresAt.toISOString(),
     };
     await this.#kv.set([KEY_PREFIX, id], updated, { expireIn });

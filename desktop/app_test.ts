@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import type { TokenRecord } from "../shared/mod.ts";
 import type { ApiClient } from "./api_client.ts";
 import { createDesktopApp } from "./app.tsx";
@@ -82,4 +82,43 @@ Deno.test("CSRF: GETリクエストはオリジンに関わらず通過する", 
   });
   assertEquals(res.status, 200);
   await res.body?.cancel();
+});
+
+Deno.test("通知はトースト（閉じるボタン＋自動消滅）として描画される", async () => {
+  const { client } = createStubClient();
+  const app = createDesktopApp(client);
+
+  const html =
+    await (await app.request("/?notice=" + encodeURIComponent("発行しました"), {
+      headers: { host: HOST },
+    })).text();
+
+  assertStringIncludes(html, "発行しました");
+  assertStringIncludes(html, "data-toast");
+  assertStringIncludes(html, "data-dismiss");
+  // 自動消滅とURL掃除のためのスクリプトが含まれる
+  assertStringIncludes(html, "dismissToast");
+  assertStringIncludes(html, "replaceState");
+  // 自動リロードは meta refresh ではなくクエリを落とすJSで行う
+  // （古い ?notice=…を発行しました がリロードで復活しないように）
+  assertEquals(html.includes('http-equiv="refresh"'), false);
+  assertStringIncludes(html, 'data-auto-refresh="60"');
+  assertStringIncludes(html, "location.replace(location.pathname)");
+});
+
+Deno.test("削除確認はconfirm()ではなく<dialog>で行う", async () => {
+  const client = {
+    listTokens: () => Promise.resolve([sampleToken]),
+  } as unknown as ApiClient;
+  const app = createDesktopApp(client);
+
+  const html = await (await app.request("/")).text();
+
+  // ブロック型のconfirm/promptは使わない
+  assertEquals(html.includes("confirm("), false);
+  assertEquals(html.includes("prompt("), false);
+  // 削除フォームはdata-confirmを持ち、確認用の<dialog>が描画される
+  assertStringIncludes(html, "data-confirm=");
+  assertStringIncludes(html, '<dialog id="confirm-dialog"');
+  assertStringIncludes(html, "showModal");
 });

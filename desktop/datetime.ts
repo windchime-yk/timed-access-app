@@ -1,10 +1,13 @@
 /**
- * ISO日時文字列を input[type=datetime-local] 用のローカル日時文字列に変換する
- * @param iso ISO 8601形式の日時文字列
+ * 日時を input[type=datetime-local]（分単位）用のローカル日時文字列に変換する
+ *
+ * 秒は表示せず、入力値は常に:00秒に揃う。保存値も分単位に揃うため、名前だけ
+ * 編集して往復させても失効日時はずれない。
+ * @param value ISO 8601形式の日時文字列、またはDate
  * @returns "YYYY-MM-DDTHH:mm" 形式のローカル日時文字列
  */
-export const toDatetimeLocal = (iso: string): string => {
-  const date = new Date(iso);
+export const toDatetimeLocal = (value: string | Date): string => {
+  const date = value instanceof Date ? value : new Date(value);
   const pad = (value: number) => String(value).padStart(2, "0");
   const ymd = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${
     pad(date.getDate())
