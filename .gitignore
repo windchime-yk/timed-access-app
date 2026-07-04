@@ -1,4 +1,6 @@
 .env
+.env.production
+.DS_Store
 
 # compiled desktop app
 TimedAccess

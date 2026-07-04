@@ -50,13 +50,55 @@ deno task check  # fmt --check / lint / type check
 
 ## デスクトップアプリのビルド
 
+開発用の `.env` を使ってビルドします。
+
 ```bash
 deno task desktop:build
 ```
 
-`desktop/TimedAccess.app` が生成されます。別プラットフォーム向けは
-`desktop/deno.json` の `build` タスクの `--output` や `--target`
-相当のオプションを調整してください。
+`desktop/TimedAccess.app`（ダブルクリックで起動できる単一アプリ）が生成されます。
+`.env` の `API_BASE_URL` と `TIMED_ACCESS_API_KEY`
+がバイナリに焼き込まれ、起動時に
+環境変数やAPIサーバーの手動起動は不要です（APIサーバー本体は別途 `API_BASE_URL`
+の場所で稼働している必要があります）。
+
+### 本番ビルド
+
+本番用の値は開発用と分けるため `.env.production` に置きます（Git管理外）。
+
+```bash
+cp .env .env.production   # 雛形としてコピー
+# .env.production を編集し、API_BASE_URL を本番APIのURLに、
+# TIMED_ACCESS_API_KEY を本番のキーに設定する
+deno task desktop:build:prod
+```
+
+`--env-file=../.env.production` を読んでビルドするため、本番URL/キーを焼き込んだ
+アプリが生成されます。
+
+> [!IMPORTANT]
+> `TIMED_ACCESS_API_KEY` はバイナリに焼き込まれ、`strings` 等で抽出できます。
+> このバイナリは**公開・再配布しないでください**（自分専用に留める）。第三者に渡す
+> 場合はキーを焼き込まず、起動時に与える方式へ変更する必要があります。
+
+別プラットフォーム向けは `desktop/deno.json` の `build` タスクの `--output`
+（`.dmg` / `.AppImage` / `.deb` / `.rpm` / `.msi`）や `--target` （例
+`x86_64-pc-windows-msvc`）を調整してください。
+
+### アイコン
+
+ビルド時に `--icon desktop/icon.png` を渡してアプリアイコンを設定します。
+`desktop/icon.png` は `desktop/scripts/generate_icon.ts` が手続き的に生成した
+時計モチーフの画像です。デザインを変えたいときはスクリプトを編集して再生成します。
+
+```bash
+deno task desktop:icon   # desktop/icon.png を再生成
+```
+
+> [!NOTE]
+> macOSは `--icon` に `.png`（または `.icns`）を受け付けます。Windows向けに
+> ビルドする場合は `.ico` が必要なので、`icon.png` から `.ico` を用意して
+> `--icon` に指定してください。
 
 ## API仕様
 

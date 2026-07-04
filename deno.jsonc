@@ -18,7 +18,9 @@
     "dev:api": "deno task --cwd api dev",
     "dev:desktop": "deno task --cwd desktop dev",
     "desktop:window": "deno task --cwd desktop dev:window",
+    "desktop:icon": "deno task --cwd desktop icon",
     "desktop:build": "deno task --cwd desktop build",
+    "desktop:build:prod": "deno task --cwd desktop build:prod",
     "cp:env": "cp .env.example .env",
     "test": "deno test --allow-env",
     "check": "deno fmt --check && deno lint && deno check"
