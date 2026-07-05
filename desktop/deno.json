@@ -1,0 +1,24 @@
+{
+  "desktop": {
+    "app": {
+      "name": "TimedAccess",
+      "icons": {
+        "macos": "icon.png",
+        "windows": "icon.ico",
+        "linux": "icon.png"
+      }
+    },
+    "output": {
+      "macos": "TimedAccess.app",
+      "windows": "TimedAccess.exe"
+    }
+  },
+  "tasks": {
+    "dev": "DESKTOP_PORT=8080 deno run --watch --env-file=../.env --allow-net --allow-env=API_BASE_URL,TIMED_ACCESS_API_KEY,DESKTOP_PORT main.ts",
+    "dev:window": "deno desktop --hmr --env-file=../.env --allow-net --allow-env=API_BASE_URL,TIMED_ACCESS_API_KEY,DESKTOP_PORT main.ts",
+    "icon": "deno run --allow-write=icon.png,icon.ico scripts/generate_icon.ts",
+    "build": "deno desktop --env-file=../.env --allow-net --allow-env=API_BASE_URL,TIMED_ACCESS_API_KEY,DESKTOP_PORT main.ts",
+    "build:prod": "deno desktop --env-file=../.env.production --allow-net --allow-env=API_BASE_URL,TIMED_ACCESS_API_KEY,DESKTOP_PORT main.ts",
+    "install": "rm -rf /Applications/TimedAccess.app && cp -r TimedAccess.app /Applications"
+  }
+}

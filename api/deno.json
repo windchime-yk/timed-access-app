@@ -1,0 +1,5 @@
+{
+  "tasks": {
+    "dev": "PORT=8000 KV_PATH=./dev.kv.sqlite3 deno run --watch --env-file=../.env --allow-net=0.0.0.0:8000 --allow-env=TIMED_ACCESS_API_KEY,KV_PATH,PORT,VERIFY_RATE_LIMIT,TRUST_PROXY --allow-read=. --allow-write=. main.ts"
+  }
+}
