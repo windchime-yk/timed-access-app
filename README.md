@@ -87,18 +87,19 @@ deno task desktop:build:prod
 
 ### アイコン
 
-ビルド時に `--icon desktop/icon.png` を渡してアプリアイコンを設定します。
-`desktop/icon.png` は `desktop/scripts/generate_icon.ts` が手続き的に生成した
-時計モチーフの画像です。デザインを変えたいときはスクリプトを編集して再生成します。
+`desktop/scripts/generate_icon.ts`
+が時計モチーフのアイコンを手続き的に生成します。 1コマンドで macOS用
+`desktop/icon.png`（1024px）と Windows用 `desktop/icon.ico`
+（16〜256pxの複数サイズを内包）を同時に出力します。デザインを変えたいときは
+スクリプトを編集して再生成してください。
 
 ```bash
-deno task desktop:icon   # desktop/icon.png を再生成
+deno task desktop:icon   # icon.png と icon.ico を再生成
 ```
 
-> [!NOTE]
-> macOSは `--icon` に `.png`（または `.icns`）を受け付けます。Windows向けに
-> ビルドする場合は `.ico` が必要なので、`icon.png` から `.ico` を用意して
-> `--icon` に指定してください。
+`build` / `build:prod` タスクは macOS 向けに `--icon icon.png` を渡します。
+Windows 向けにビルドする場合は `--icon icon.ico` と
+`--target x86_64-pc-windows-msvc` を指定してください。
 
 ## API仕様
 

@@ -1,27 +1,11 @@
-// アプリアイコン（desktop/icon.png）を生成する。
-// 外部ツールに依存せず、角丸バッジ＋時計（時限アクセスの象徴）を手続き的に描く。
+// アプリアイコンを生成する。外部ツールに依存せず、角丸バッジ＋時計（時限アクセスの
+// 象徴）を手続き的に描き、macOS用 icon.png と Windows用 icon.ico を同時に出力する。
 // デザインを変えたいときはこのスクリプトを編集して `deno task --cwd desktop icon` を実行する。
-
-const SIZE = 1024;
-const buf = new Uint8Array(SIZE * SIZE * 4); // RGBA、初期値は透明
 
 type RGB = [number, number, number];
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-
-/** アンチエイリアス付きで1ピクセルにアルファ合成する */
-const blend = (x: number, y: number, [r, g, b]: RGB, a: number) => {
-  if (a <= 0 || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return;
-  const i = (y * SIZE + x) * 4;
-  const da = buf[i + 3] / 255;
-  const outA = a + da * (1 - a);
-  if (outA <= 0) return;
-  buf[i] = Math.round((r * a + buf[i] * da * (1 - a)) / outA);
-  buf[i + 1] = Math.round((g * a + buf[i + 1] * da * (1 - a)) / outA);
-  buf[i + 2] = Math.round((b * a + buf[i + 2] * da * (1 - a)) / outA);
-  buf[i + 3] = Math.round(outA * 255);
-};
 
 /** 符号付き距離（境界より内側で負）を1px幅のカバレッジに変換する */
 const coverage = (signedDistance: number) => clamp01(0.5 - signedDistance);
@@ -61,90 +45,149 @@ const sdSegment = (
   return Math.hypot(pax - bax * h, pay - bay * h);
 };
 
-const forEachPixel = (
-  bounds: { x0: number; y0: number; x1: number; y1: number },
-  draw: (x: number, y: number) => void,
-) => {
-  const x0 = Math.max(0, Math.floor(bounds.x0));
-  const y0 = Math.max(0, Math.floor(bounds.y0));
-  const x1 = Math.min(SIZE, Math.ceil(bounds.x1));
-  const y1 = Math.min(SIZE, Math.ceil(bounds.y1));
-  for (let y = y0; y < y1; y++) {
-    for (let x = x0; x < x1; x++) draw(x + 0.5, y + 0.5);
+/** 指定サイズでアイコンを描画し、RGBAバッファを返す */
+const renderAt = (size: number): Uint8Array<ArrayBuffer> => {
+  const buf = new Uint8Array(size * size * 4); // RGBA、初期値は透明
+  const center = size / 2;
+  const px = (ratio: number) => ratio * size;
+
+  const blend = (x: number, y: number, [r, g, b]: RGB, a: number) => {
+    if (a <= 0 || x < 0 || y < 0 || x >= size || y >= size) return;
+    const i = (y * size + x) * 4;
+    const da = buf[i + 3] / 255;
+    const outA = a + da * (1 - a);
+    if (outA <= 0) return;
+    buf[i] = Math.round((r * a + buf[i] * da * (1 - a)) / outA);
+    buf[i + 1] = Math.round((g * a + buf[i + 1] * da * (1 - a)) / outA);
+    buf[i + 2] = Math.round((b * a + buf[i + 2] * da * (1 - a)) / outA);
+    buf[i + 3] = Math.round(outA * 255);
+  };
+
+  const forEachPixel = (
+    bounds: { x0: number; y0: number; x1: number; y1: number },
+    draw: (x: number, y: number) => void,
+  ) => {
+    const x0 = Math.max(0, Math.floor(bounds.x0));
+    const y0 = Math.max(0, Math.floor(bounds.y0));
+    const x1 = Math.min(size, Math.ceil(bounds.x1));
+    const y1 = Math.min(size, Math.ceil(bounds.y1));
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) draw(x + 0.5, y + 0.5);
+    }
+  };
+
+  // 1. 角丸バッジの背景（上から下への青のグラデーション）
+  const margin = px(0.055);
+  const half = center - margin;
+  const bgTop: RGB = [59, 130, 246];
+  const bgBottom: RGB = [37, 99, 235];
+  forEachPixel({ x0: 0, y0: 0, x1: size, y1: size }, (x, y) => {
+    const c = coverage(sdRoundRect(x, y, center, center, half, half, px(0.22)));
+    if (c <= 0) return;
+    const t = clamp01((y - margin) / (size - 2 * margin));
+    blend(Math.floor(x), Math.floor(y), [
+      Math.round(lerp(bgTop[0], bgBottom[0], t)),
+      Math.round(lerp(bgTop[1], bgBottom[1], t)),
+      Math.round(lerp(bgTop[2], bgBottom[2], t)),
+    ], c);
+  });
+
+  // 2. 時計の白い文字盤
+  const faceR = px(0.3);
+  const clockBox = {
+    x0: center - faceR - 4,
+    y0: center - faceR - 4,
+    x1: center + faceR + 4,
+    y1: center + faceR + 4,
+  };
+  forEachPixel(clockBox, (x, y) => {
+    const c = coverage(sdCircle(x, y, center, center, faceR));
+    if (c > 0) blend(Math.floor(x), Math.floor(y), [255, 255, 255], c);
+  });
+
+  // 3. 目盛り（12本）
+  const tick: RGB = [96, 165, 250];
+  const tickInner = px(0.24);
+  const tickOuter = px(0.275);
+  const tickWidth = px(0.011);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const dx = Math.sin(a);
+    const dy = -Math.cos(a);
+    const ax = center + dx * tickInner;
+    const ay = center + dy * tickInner;
+    const bx = center + dx * tickOuter;
+    const by = center + dy * tickOuter;
+    forEachPixel(clockBox, (x, y) => {
+      const c = coverage(sdSegment(x, y, ax, ay, bx, by) - tickWidth);
+      if (c > 0) blend(Math.floor(x), Math.floor(y), tick, c);
+    });
   }
-};
 
-const px = (ratio: number) => ratio * SIZE;
-const center = SIZE / 2;
+  // 4. 時針・分針（10:10 のバランスのよい配置）
+  const hand: RGB = [30, 58, 138];
+  const drawHand = (angleDeg: number, length: number, width: number) => {
+    const a = (angleDeg * Math.PI) / 180;
+    const ex = center + Math.sin(a) * length;
+    const ey = center - Math.cos(a) * length;
+    forEachPixel(clockBox, (x, y) => {
+      const c = coverage(sdSegment(x, y, center, center, ex, ey) - width);
+      if (c > 0) blend(Math.floor(x), Math.floor(y), hand, c);
+    });
+  };
+  drawHand(305, px(0.14), px(0.013)); // 時針
+  drawHand(60, px(0.2), px(0.01)); // 分針
 
-// 1. 角丸バッジの背景（上から下への青のグラデーション）
-const margin = px(0.055);
-const half = center - margin;
-const bgTop: RGB = [59, 130, 246];
-const bgBottom: RGB = [37, 99, 235];
-forEachPixel({ x0: 0, y0: 0, x1: SIZE, y1: SIZE }, (x, y) => {
-  const c = coverage(sdRoundRect(x, y, center, center, half, half, px(0.22)));
-  if (c <= 0) return;
-  const t = clamp01((y - margin) / (SIZE - 2 * margin));
-  blend(Math.floor(x), Math.floor(y), [
-    Math.round(lerp(bgTop[0], bgBottom[0], t)),
-    Math.round(lerp(bgTop[1], bgBottom[1], t)),
-    Math.round(lerp(bgTop[2], bgBottom[2], t)),
-  ], c);
-});
-
-// 2. 時計の白い文字盤
-const faceR = px(0.3);
-const clockBox = {
-  x0: center - faceR - 4,
-  y0: center - faceR - 4,
-  x1: center + faceR + 4,
-  y1: center + faceR + 4,
-};
-forEachPixel(clockBox, (x, y) => {
-  const c = coverage(sdCircle(x, y, center, center, faceR));
-  if (c > 0) blend(Math.floor(x), Math.floor(y), [255, 255, 255], c);
-});
-
-// 3. 目盛り（12本）
-const tick: RGB = [96, 165, 250];
-const tickInner = px(0.24);
-const tickOuter = px(0.275);
-const tickWidth = px(0.011);
-for (let i = 0; i < 12; i++) {
-  const a = (i / 12) * Math.PI * 2;
-  const dx = Math.sin(a);
-  const dy = -Math.cos(a);
-  const ax = center + dx * tickInner;
-  const ay = center + dy * tickInner;
-  const bx = center + dx * tickOuter;
-  const by = center + dy * tickOuter;
+  // 5. 中心のハブ
+  const hub: RGB = [37, 99, 235];
   forEachPixel(clockBox, (x, y) => {
-    const c = coverage(sdSegment(x, y, ax, ay, bx, by) - tickWidth);
-    if (c > 0) blend(Math.floor(x), Math.floor(y), tick, c);
+    const c = coverage(sdCircle(x, y, center, center, px(0.022)));
+    if (c > 0) blend(Math.floor(x), Math.floor(y), hub, c);
   });
-}
 
-// 4. 時針・分針（10:10 のバランスのよい配置）
-const hand: RGB = [30, 58, 138];
-const drawHand = (angleDeg: number, length: number, width: number) => {
-  const a = (angleDeg * Math.PI) / 180;
-  const ex = center + Math.sin(a) * length;
-  const ey = center - Math.cos(a) * length;
-  forEachPixel(clockBox, (x, y) => {
-    const c = coverage(sdSegment(x, y, center, center, ex, ey) - width);
-    if (c > 0) blend(Math.floor(x), Math.floor(y), hand, c);
-  });
+  return buf;
 };
-drawHand(305, px(0.14), px(0.013)); // 時針
-drawHand(60, px(0.2), px(0.01)); // 分針
 
-// 5. 中心のハブ
-const hub: RGB = [37, 99, 235];
-forEachPixel(clockBox, (x, y) => {
-  const c = coverage(sdCircle(x, y, center, center, px(0.022)));
-  if (c > 0) blend(Math.floor(x), Math.floor(y), hub, c);
-});
+/** 高解像度で描いて縮小（スーパーサンプリング）し、小サイズでも滑らかにする */
+const downsample = (
+  src: Uint8Array,
+  size: number,
+  ss: number,
+): Uint8Array<ArrayBuffer> => {
+  const big = size * ss;
+  const out = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let sr = 0, sg = 0, sb = 0, sa = 0;
+      for (let dy = 0; dy < ss; dy++) {
+        for (let dx = 0; dx < ss; dx++) {
+          const i = ((y * ss + dy) * big + (x * ss + dx)) * 4;
+          const a = src[i + 3] / 255;
+          // 透明境界の色にじみを防ぐため乗算済みアルファで平均する
+          sr += src[i] * a;
+          sg += src[i + 1] * a;
+          sb += src[i + 2] * a;
+          sa += a;
+        }
+      }
+      const o = (y * size + x) * 4;
+      if (sa > 0) {
+        out[o] = Math.round(sr / sa);
+        out[o + 1] = Math.round(sg / sa);
+        out[o + 2] = Math.round(sb / sa);
+      }
+      out[o + 3] = Math.round((sa / (ss * ss)) * 255);
+    }
+  }
+  return out;
+};
+
+/** 目標サイズのアイコンを、必要に応じてスーパーサンプリングして描く */
+const renderIcon = (size: number): Uint8Array<ArrayBuffer> => {
+  // 内部解像度を256px以上に保ち、どのサイズでも十分にアンチエイリアスする
+  const ss = Math.max(1, Math.ceil(256 / size));
+  return ss === 1 ? renderAt(size) : downsample(renderAt(size * ss), size, ss);
+};
 
 // --- PNGエンコード（依存なし。DEFLATEはCompressionStream、CRC32は自前） ---
 
@@ -185,40 +228,95 @@ const deflate = async (data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> => {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 };
 
-// フィルタバイト0を各スキャンライン先頭に付けた生データ
-const raw = new Uint8Array((SIZE * 4 + 1) * SIZE);
-for (let y = 0; y < SIZE; y++) {
-  raw[y * (SIZE * 4 + 1)] = 0;
-  raw.set(
-    buf.subarray(y * SIZE * 4, (y + 1) * SIZE * 4),
-    y * (SIZE * 4 + 1) + 1,
-  );
-}
+const encodePng = async (
+  size: number,
+  rgba: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> => {
+  // フィルタバイト0を各スキャンライン先頭に付けた生データ
+  const raw = new Uint8Array((size * 4 + 1) * size);
+  for (let y = 0; y < size; y++) {
+    raw[y * (size * 4 + 1)] = 0;
+    raw.set(
+      rgba.subarray(y * size * 4, (y + 1) * size * 4),
+      y * (size * 4 + 1) + 1,
+    );
+  }
 
-const ihdr = new Uint8Array(13);
-const ihdrView = new DataView(ihdr.buffer);
-ihdrView.setUint32(0, SIZE);
-ihdrView.setUint32(4, SIZE);
-ihdr[8] = 8; // ビット深度
-ihdr[9] = 6; // カラータイプ: RGBA
-// 10-12: 圧縮/フィルタ/インターレース = 0
+  const ihdr = new Uint8Array(13);
+  const ihdrView = new DataView(ihdr.buffer);
+  ihdrView.setUint32(0, size);
+  ihdrView.setUint32(4, size);
+  ihdr[8] = 8; // ビット深度
+  ihdr[9] = 6; // カラータイプ: RGBA
 
-const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-const idat = await deflate(raw);
-const parts = [
-  signature,
-  chunk("IHDR", ihdr),
-  chunk("IDAT", idat),
-  chunk("IEND", new Uint8Array(0)),
-];
-const total = parts.reduce((n, p) => n + p.length, 0);
-const png = new Uint8Array(total);
-let offset = 0;
-for (const p of parts) {
-  png.set(p, offset);
-  offset += p.length;
-}
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const idat = await deflate(raw);
+  const parts = [
+    signature,
+    chunk("IHDR", ihdr),
+    chunk("IDAT", idat),
+    chunk("IEND", new Uint8Array(0)),
+  ];
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const png = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) {
+    png.set(p, offset);
+    offset += p.length;
+  }
+  return png;
+};
 
-const outPath = new URL("../icon.png", import.meta.url);
-await Deno.writeFile(outPath, png);
-console.log(`Wrote ${outPath.pathname} (${SIZE}x${SIZE}, ${png.length} bytes)`);
+// --- ICOエンコード（各サイズのPNGを内包する。Vista以降が対応） ---
+
+const encodeIco = (
+  images: { size: number; png: Uint8Array }[],
+): Uint8Array<ArrayBuffer> => {
+  const headerSize = 6 + images.length * 16;
+  const totalSize = images.reduce((n, img) => n + img.png.length, headerSize);
+  const out = new Uint8Array(totalSize);
+  const view = new DataView(out.buffer);
+  view.setUint16(0, 0, true); // 予約
+  view.setUint16(2, 1, true); // タイプ: アイコン
+  view.setUint16(4, images.length, true); // 画像数
+
+  let dataOffset = headerSize;
+  images.forEach((img, index) => {
+    const e = 6 + index * 16;
+    out[e] = img.size >= 256 ? 0 : img.size; // 幅（256は0で表す）
+    out[e + 1] = img.size >= 256 ? 0 : img.size; // 高さ
+    out[e + 2] = 0; // パレット色数
+    out[e + 3] = 0; // 予約
+    view.setUint16(e + 4, 1, true); // カラープレーン数
+    view.setUint16(e + 6, 32, true); // ビット深度
+    view.setUint32(e + 8, img.png.length, true); // データ長
+    view.setUint32(e + 12, dataOffset, true); // データ位置
+    out.set(img.png, dataOffset);
+    dataOffset += img.png.length;
+  });
+  return out;
+};
+
+// --- 出力 ---
+
+const pngPath = new URL("../icon.png", import.meta.url);
+const icoPath = new URL("../icon.ico", import.meta.url);
+
+// macOS用: 1024pxの単一PNG
+const mainPng = await encodePng(1024, renderIcon(1024));
+await Deno.writeFile(pngPath, mainPng);
+console.log(`Wrote ${pngPath.pathname} (1024x1024, ${mainPng.length} bytes)`);
+
+// Windows用: 複数サイズを内包した.ico
+const icoSizes = [16, 32, 48, 64, 128, 256];
+const icoImages = await Promise.all(
+  icoSizes.map(async (size) => ({
+    size,
+    png: await encodePng(size, renderIcon(size)),
+  })),
+);
+const ico = encodeIco(icoImages);
+await Deno.writeFile(icoPath, ico);
+console.log(
+  `Wrote ${icoPath.pathname} (${icoSizes.join("/")}px, ${ico.length} bytes)`,
+);
