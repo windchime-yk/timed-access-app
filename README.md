@@ -62,6 +62,13 @@ deno task desktop:build
 環境変数やAPIサーバーの手動起動は不要です（APIサーバー本体は別途 `API_BASE_URL`
 の場所で稼働している必要があります）。
 
+生成した `.app` を macOS の `/Applications`
+へ移動するには（既存があれば置き換え）:
+
+```bash
+deno task desktop:install
+```
+
 ### 本番ビルド
 
 本番用の値は開発用と分けるため `.env.production` に置きます（Git管理外）。

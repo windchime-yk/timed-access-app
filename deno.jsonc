@@ -21,6 +21,7 @@
     "desktop:icon": "deno task --cwd desktop icon",
     "desktop:build": "deno task --cwd desktop build",
     "desktop:build:prod": "deno task --cwd desktop build:prod",
+    "desktop:install": "deno task --cwd desktop install",
     "cp:env": "cp .env.example .env",
     "test": "deno test --allow-env",
     "check": "deno fmt --check && deno lint && deno check"
