@@ -11,3 +11,11 @@ Deno.serve(
   port ? { hostname: "127.0.0.1", port: Number(port) } : {},
   app.fetch,
 );
+
+// deno desktop 実行時は、最初に構築した BrowserWindow が自動生成された起動ウィンドウを
+// 引き取る。タイトルバーの既定表示（dylibのファイル名）を上書きしてアプリ名にする。
+// 通常の deno run（dev/ブラウザ確認）では Deno.BrowserWindow が無いのでスキップする。
+const BrowserWindow =
+  (Deno as { BrowserWindow?: new (options: { title: string }) => unknown })
+    .BrowserWindow;
+if (BrowserWindow) new BrowserWindow({ title: "TimedAccess" });
