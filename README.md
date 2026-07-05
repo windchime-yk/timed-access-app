@@ -88,9 +88,21 @@ deno task desktop:build:prod
 > このバイナリは**公開・再配布しないでください**（自分専用に留める）。第三者に渡す
 > 場合はキーを焼き込まず、起動時に与える方式へ変更する必要があります。
 
-別プラットフォーム向けは `desktop/deno.json` の `build` タスクの `--output`
-（`.dmg` / `.AppImage` / `.deb` / `.rpm` / `.msi`）や `--target` （例
-`x86_64-pc-windows-msvc`）を調整してください。
+アプリ名・アイコン・出力パスは `desktop/deno.json` の `desktop`
+ブロックで設定します（CLIフラグではなく設定ファイルに集約）。
+
+```jsonc
+"desktop": {
+  "app": {
+    "name": "TimedAccess", // ウィンドウタイトル/メニューバー名等
+    "icons": { "macos": "icon.png", "windows": "icon.ico", "linux": "icon.png" }
+  },
+  "output": { "macos": "TimedAccess.app", "windows": "TimedAccess.exe" }
+}
+```
+
+別プラットフォーム向けは `--target`（例 `x86_64-pc-windows-msvc`）を付けて
+ビルドします。ターゲットに応じて上記の `icons` / `output` が自動で選ばれます。
 
 ### アイコン
 
@@ -104,9 +116,9 @@ deno task desktop:build:prod
 deno task desktop:icon   # icon.png と icon.ico を再生成
 ```
 
-`build` / `build:prod` タスクは macOS 向けに `--icon icon.png` を渡します。
-Windows 向けにビルドする場合は `--icon icon.ico` と
-`--target x86_64-pc-windows-msvc` を指定してください。
+どのアイコンを使うかは `desktop/deno.json` の `desktop.app.icons` （`macos` /
+`windows` / `linux`）で設定済みです。ビルドターゲットに応じて
+自動で選ばれるため、`--icon` をCLIで渡す必要はありません。
 
 ## API仕様
 
