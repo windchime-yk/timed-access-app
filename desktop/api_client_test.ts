@@ -36,9 +36,9 @@ Deno.test("ApiClient: baseUrl末尾のスラッシュは重複させない", () 
     assertEquals(calls[0], "http://localhost:8000/tokens");
   }));
 
-Deno.test("ApiClient: verifyのIDはURLエンコードされる", () =>
+Deno.test("ApiClient: verifyのサイト名とIDはURLエンコードされる", () =>
   withFetchSpy(async (calls) => {
     const client = new ApiClient("http://localhost:8000", "key");
-    await client.verifyToken("a/b");
-    assertEquals(calls[0], "http://localhost:8000/verify/a%2Fb");
+    await client.verifyToken("s/x", "a/b");
+    assertEquals(calls[0], "http://localhost:8000/verify/s%2Fx/a%2Fb");
   }));

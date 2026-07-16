@@ -47,6 +47,7 @@ const TokenTable = ({ tokens }: { tokens: TokenRecord[] }) => {
       <thead>
         <tr>
           <th>トークン（ULID）</th>
+          <th>サイト</th>
           <th>表示名</th>
           <th>発行日時</th>
           <th>失効日時</th>
@@ -58,6 +59,9 @@ const TokenTable = ({ tokens }: { tokens: TokenRecord[] }) => {
           <tr>
             <td>
               <code>{token.id}</code>
+            </td>
+            <td>
+              <code>{token.site}</code>
             </td>
             <td>{token.name}</td>
             <td>{formatDateTime(token.createdAt)}</td>
@@ -77,13 +81,13 @@ const TokenTable = ({ tokens }: { tokens: TokenRecord[] }) => {
                 </button>
                 <a
                   class={cx(styles.button, styles.buttonGhost)}
-                  href={`/tokens/${token.id}/edit`}
+                  href={`/tokens/${token.site}/${token.id}/edit`}
                 >
                   編集
                 </a>
                 <form
                   method="post"
-                  action={`/tokens/${token.id}/delete`}
+                  action={`/tokens/${token.site}/${token.id}/delete`}
                   data-confirm={`トークン「${token.name}」を失効させますか？`}
                 >
                   <button
@@ -114,6 +118,17 @@ export const IndexPage = ({ tokens, notice, error }: IndexPageProps) => (
     <section class={styles.card}>
       <h2>新しいトークンを発行</h2>
       <form class={styles.stackForm} method="post" action="/tokens">
+        <label>
+          サイト名
+          <input
+            type="text"
+            name="site"
+            required
+            pattern="[a-z0-9-]{1,64}"
+            title="英小文字・数字・ハイフン1〜64文字"
+            placeholder="例：blog"
+          />
+        </label>
         <label>
           表示名（任意）
           <input type="text" name="name" placeholder="例：社外向け共有リンク" />
@@ -149,12 +164,14 @@ export const EditPage = ({ token, error }: EditPageProps) => (
     <Banners error={error} />
     <section class={styles.card}>
       <h2>
-        トークンを編集：<code>{token.id}</code>
+        トークンを編集：<code>{token.id}</code>（サイト：<code>
+          {token.site}
+        </code>）
       </h2>
       <form
         class={styles.stackForm}
         method="post"
-        action={`/tokens/${token.id}/edit`}
+        action={`/tokens/${token.site}/${token.id}/edit`}
       >
         <label>
           表示名
@@ -184,17 +201,30 @@ export const EditPage = ({ token, error }: EditPageProps) => (
 );
 
 type VerifyPageProps = {
+  site?: string;
   id?: string;
   result?: VerifyResult;
   error?: string;
 };
 
-export const VerifyPage = ({ id, result, error }: VerifyPageProps) => (
+export const VerifyPage = ({ site, id, result, error }: VerifyPageProps) => (
   <Layout title="トークン検証">
     <Banners error={error} />
     <section class={styles.card}>
       <h2>トークンを検証</h2>
       <form class={styles.stackForm} method="get" action="/verify">
+        <label>
+          サイト名
+          <input
+            type="text"
+            name="site"
+            required
+            pattern="[a-z0-9-]{1,64}"
+            title="英小文字・数字・ハイフン1〜64文字"
+            value={site ?? ""}
+            placeholder="例：blog"
+          />
+        </label>
         <label>
           トークン（ULID）
           <input
@@ -220,7 +250,8 @@ export const VerifyPage = ({ id, result, error }: VerifyPageProps) => (
                   有効なトークンです
                 </p>
                 <p>
-                  <code>{result.token.id}</code>（{result.token.name}）
+                  <code>{result.token.id}</code>（サイト：{result.token.site}
+                  ／{result.token.name}）
                 </p>
                 <p>
                   失効日時：{formatDateTime(result.token.expiresAt)}（

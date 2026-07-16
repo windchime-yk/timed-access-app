@@ -42,17 +42,19 @@ const redirectWithError = (ctx: Context, message: string) =>
 const redirectWithNotice = (ctx: Context, message: string) =>
   ctx.redirect(`/?notice=${encodeURIComponent(message)}`, 303);
 
-/** フォームから表示名と失効日時を取り出す */
+/** フォームからサイト名・表示名・失効日時を取り出す */
 const parseTokenForm = async (
   ctx: Context,
-): Promise<{ name: string; expiresAt: Date | null }> => {
+): Promise<{ site: string; name: string; expiresAt: Date | null }> => {
   const form = await ctx.req.parseBody();
+  const site = typeof form.site === "string" ? form.site.trim() : "";
   const name = typeof form.name === "string" ? form.name : "";
   const expiresLocal = typeof form.expires_at === "string"
     ? form.expires_at
     : "";
   const expiresAt = expiresLocal ? new Date(expiresLocal) : null;
   return {
+    site,
     name,
     expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime())
       ? expiresAt
@@ -84,12 +86,16 @@ export const createDesktopApp = (client: ApiClient) => {
   });
 
   app.post("/tokens", async (ctx) => {
-    const { name, expiresAt } = await parseTokenForm(ctx);
+    const { site, name, expiresAt } = await parseTokenForm(ctx);
+    if (!site) {
+      return redirectWithError(ctx, "サイト名を入力してください");
+    }
     if (expiresAt === null) {
       return redirectWithError(ctx, "失効日時を入力してください");
     }
     try {
       const token = await client.createToken({
+        site,
         name,
         expiresAt: expiresAt.toISOString(),
       });
@@ -99,9 +105,12 @@ export const createDesktopApp = (client: ApiClient) => {
     }
   });
 
-  app.get("/tokens/:id/edit", async (ctx) => {
+  app.get("/tokens/:site/:id/edit", async (ctx) => {
     try {
-      const token = await client.getToken(ctx.req.param("id"));
+      const token = await client.getToken(
+        ctx.req.param("site"),
+        ctx.req.param("id"),
+      );
       return ctx.html(
         <EditPage token={token} error={ctx.req.query("error")} />,
       );
@@ -110,34 +119,37 @@ export const createDesktopApp = (client: ApiClient) => {
     }
   });
 
-  app.post("/tokens/:id/edit", async (ctx) => {
+  app.post("/tokens/:site/:id/edit", async (ctx) => {
+    const site = ctx.req.param("site");
     const id = ctx.req.param("id");
     const { name, expiresAt } = await parseTokenForm(ctx);
     if (expiresAt === null) {
       return ctx.redirect(
-        `/tokens/${id}/edit?error=${
+        `/tokens/${site}/${id}/edit?error=${
           encodeURIComponent("失効日時を入力してください")
         }`,
         303,
       );
     }
     try {
-      await client.updateToken(id, {
+      await client.updateToken(site, id, {
         name,
         expiresAt: expiresAt.toISOString(),
       });
       return redirectWithNotice(ctx, "トークンを更新しました");
     } catch (err) {
       return ctx.redirect(
-        `/tokens/${id}/edit?error=${encodeURIComponent(errorMessage(err))}`,
+        `/tokens/${site}/${id}/edit?error=${
+          encodeURIComponent(errorMessage(err))
+        }`,
         303,
       );
     }
   });
 
-  app.post("/tokens/:id/delete", async (ctx) => {
+  app.post("/tokens/:site/:id/delete", async (ctx) => {
     try {
-      await client.deleteToken(ctx.req.param("id"));
+      await client.deleteToken(ctx.req.param("site"), ctx.req.param("id"));
       return redirectWithNotice(ctx, "トークンを失効させました");
     } catch (err) {
       return redirectWithError(ctx, errorMessage(err));
@@ -145,13 +157,16 @@ export const createDesktopApp = (client: ApiClient) => {
   });
 
   app.get("/verify", async (ctx) => {
+    const site = ctx.req.query("site")?.trim();
     const id = ctx.req.query("id")?.trim();
-    if (!id) return ctx.html(<VerifyPage />);
+    if (!site || !id) return ctx.html(<VerifyPage site={site} id={id} />);
     try {
-      const result = await client.verifyToken(id);
-      return ctx.html(<VerifyPage id={id} result={result} />);
+      const result = await client.verifyToken(site, id);
+      return ctx.html(<VerifyPage site={site} id={id} result={result} />);
     } catch (err) {
-      return ctx.html(<VerifyPage id={id} error={errorMessage(err)} />);
+      return ctx.html(
+        <VerifyPage site={site} id={id} error={errorMessage(err)} />,
+      );
     }
   });
 

@@ -1,6 +1,6 @@
 # timed-access-app
 
-時限式アクセストークン管理アプリ。失効日時を設定してULIDを発行し、その時刻になるとトークンが自動で失効します。発行・検証はAPIが担い、デスクトップアプリからCRUD操作ができます。
+時限式アクセストークン管理アプリ。サイトごとに失効日時を設定してULIDを発行し、その時刻になるとトークンが自動で失効します。発行・検証はAPIが担い、デスクトップアプリからCRUD操作ができます。
 
 ## 構成
 
@@ -14,6 +14,7 @@ Deno Workspaceで3つのパッケージを管理しています。
 
 - ULIDは `@std/ulid` で生成し、Deno KVの `expireIn`
   により失効日時ちょうどにレコードが自動削除されます
+- トークンはサイト名（英小文字・数字・ハイフンのスラッグ）ごとに保存・検証されます
 - 依存関係はすべてJSRから取得しています
 
 ## セットアップ
@@ -126,14 +127,18 @@ deno task desktop:icon   # icon.png と icon.ico を再生成
 `TIMED_ACCESS_API_KEY`
 と同じ値が必要です。検証（`/verify`）は外部アプリからの利用を想定しているため、認証不要でCORS許可（`Access-Control-Allow-Origin: *`）です。
 
-| メソッド | パス          | 認証 | 説明                                                               |
-| -------- | ------------- | ---- | ------------------------------------------------------------------ |
-| `POST`   | `/tokens`     | 必要 | トークン発行。`{ "name"?: string, "expiresAt": string(ISO 8601) }` |
-| `GET`    | `/tokens`     | 必要 | 有効なトークンの一覧                                               |
-| `GET`    | `/tokens/:id` | 必要 | トークンの取得（失効済みは404）                                    |
-| `PATCH`  | `/tokens/:id` | 必要 | 表示名・失効日時の更新                                             |
-| `DELETE` | `/tokens/:id` | 必要 | トークンの即時失効                                                 |
-| `GET`    | `/verify/:id` | 不要 | トークン検証。`{ "valid": boolean, "token"?: TokenRecord }`        |
+| メソッド | パス                | 認証 | 説明                                                                               |
+| -------- | ------------------- | ---- | ---------------------------------------------------------------------------------- |
+| `POST`   | `/tokens`           | 必要 | トークン発行。`{ "site": string, "name"?: string, "expiresAt": string(ISO 8601) }` |
+| `GET`    | `/tokens`           | 必要 | 有効なトークンの一覧。`?site=` でサイト絞り込み                                    |
+| `GET`    | `/tokens/:site/:id` | 必要 | トークンの取得（失効済みは404）                                                    |
+| `PATCH`  | `/tokens/:site/:id` | 必要 | 表示名・失効日時の更新                                                             |
+| `DELETE` | `/tokens/:site/:id` | 必要 | トークンの即時失効                                                                 |
+| `GET`    | `/verify/:site/:id` | 不要 | トークン検証。`{ "valid": boolean, "token"?: TokenRecord }`                        |
+
+`site` はトークンを使うサイトを区別するスラッグで、英小文字・数字・ハイフン
+1〜64文字（`^[a-z0-9-]{1,64}$`）です。発行時に指定したサイト名と一致するパスで
+のみ検証が通るため、同じAPIを複数サイトで使い分けられます。
 
 ### 外部アプリからの検証
 
@@ -141,7 +146,7 @@ deno task desktop:icon   # icon.png と icon.ico を再生成
 
 ```ts
 const res = await fetch(
-  `https://your-api.example.com/verify/${ulid}`,
+  `https://your-api.example.com/verify/${siteName}/${ulid}`,
 );
 const { valid } = await res.json();
 if (valid) {
@@ -149,7 +154,8 @@ if (valid) {
 }
 ```
 
-- 失効日時を過ぎたULIDや削除済みのULIDは `{ "valid": false }` になります
+- 失効日時を過ぎたULIDや削除済みのULID、発行時と異なるサイト名での検証は
+  `{ "valid": false }` になります
 - レスポンスには `Cache-Control: no-store`
   が付き、判定結果はキャッシュされません
 - 存在しないIDでも200で `{ "valid": false }`
@@ -177,6 +183,7 @@ if (valid) {
 ```json
 {
   "id": "01JZ0000000000000000000000",
+  "site": "blog",
   "name": "社外向け共有リンク",
   "createdAt": "2026-07-04T03:00:00.000Z",
   "expiresAt": "2026-07-05T03:00:00.000Z"
