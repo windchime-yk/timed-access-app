@@ -84,24 +84,38 @@ export class ApiClient {
     });
   }
 
-  getToken(id: string): Promise<TokenRecord> {
-    return this.#request(`/tokens/${encodeURIComponent(id)}`);
+  getToken(site: string, id: string): Promise<TokenRecord> {
+    return this.#request(
+      `/tokens/${encodeURIComponent(site)}/${encodeURIComponent(id)}`,
+    );
   }
 
-  updateToken(id: string, input: TokenUpdateInput): Promise<TokenRecord> {
-    return this.#request(`/tokens/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(input),
-    });
+  updateToken(
+    site: string,
+    id: string,
+    input: TokenUpdateInput,
+  ): Promise<TokenRecord> {
+    return this.#request(
+      `/tokens/${encodeURIComponent(site)}/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
   }
 
-  deleteToken(id: string): Promise<void> {
-    return this.#request(`/tokens/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+  deleteToken(site: string, id: string): Promise<void> {
+    return this.#request(
+      `/tokens/${encodeURIComponent(site)}/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 
-  verifyToken(id: string): Promise<VerifyResult> {
-    return this.#request(`/verify/${encodeURIComponent(id)}`);
+  verifyToken(site: string, id: string): Promise<VerifyResult> {
+    return this.#request(
+      `/verify/${encodeURIComponent(site)}/${encodeURIComponent(id)}`,
+    );
   }
 }

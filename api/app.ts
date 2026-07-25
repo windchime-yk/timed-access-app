@@ -3,7 +3,11 @@ import type { Context } from "@hono/hono";
 import { cors } from "@hono/hono/cors";
 import { HTTPException } from "@hono/hono/http-exception";
 import { STATUS_CODE } from "@std/http/status";
-import type { TokenCreateInput, TokenUpdateInput } from "../shared/mod.ts";
+import {
+  SITE_NAME_PATTERN,
+  type TokenCreateInput,
+  type TokenUpdateInput,
+} from "../shared/mod.ts";
 import { requireApiKey } from "./middleware/api_key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate_limit.ts";
 import type { TokenStore } from "./store.ts";
@@ -41,6 +45,19 @@ const parseExpiresAt = (value: unknown): Date => {
   return date;
 };
 
+/**
+ * サイト名の入力値を検証する
+ * @throws {HTTPException} スラッグとして不正な場合は400
+ */
+const parseSite = (value: unknown): string => {
+  if (typeof value !== "string" || !SITE_NAME_PATTERN.test(value)) {
+    throw new HTTPException(STATUS_CODE.BadRequest, {
+      message: "site は英小文字・数字・ハイフン1〜64文字で指定してください",
+    });
+  }
+  return value;
+};
+
 const tokenNotFound = () =>
   new HTTPException(STATUS_CODE.NotFound, {
     message: "指定されたトークンは存在しないか、既に失効しています",
@@ -74,6 +91,7 @@ export const createApp = (store: TokenStore, options: AppOptions = {}) => {
   app.post("/tokens", async (ctx) => {
     const body = await parseJsonBody<TokenCreateInput>(ctx);
     const token = await store.create({
+      site: parseSite(body.site),
       name: body.name,
       expiresAt: parseExpiresAt(body.expiresAt),
     });
@@ -81,37 +99,51 @@ export const createApp = (store: TokenStore, options: AppOptions = {}) => {
   });
 
   app.get("/tokens", async (ctx) => {
-    return ctx.json({ tokens: await store.list() });
-  });
-
-  app.get("/tokens/:id", async (ctx) => {
-    const token = await store.get(ctx.req.param("id"));
-    if (token === null) throw tokenNotFound();
-    return ctx.json(token);
-  });
-
-  app.patch("/tokens/:id", async (ctx) => {
-    const body = await parseJsonBody<TokenUpdateInput>(ctx);
-    const token = await store.update(ctx.req.param("id"), {
-      name: body.name,
-      expiresAt: body.expiresAt === undefined
-        ? undefined
-        : parseExpiresAt(body.expiresAt),
+    const site = ctx.req.query("site");
+    return ctx.json({
+      tokens: await store.list(
+        site === undefined ? undefined : parseSite(site),
+      ),
     });
+  });
+
+  app.get("/tokens/:site/:id", async (ctx) => {
+    const token = await store.get(ctx.req.param("site"), ctx.req.param("id"));
     if (token === null) throw tokenNotFound();
     return ctx.json(token);
   });
 
-  app.delete("/tokens/:id", async (ctx) => {
-    const deleted = await store.delete(ctx.req.param("id"));
+  app.patch("/tokens/:site/:id", async (ctx) => {
+    const body = await parseJsonBody<TokenUpdateInput>(ctx);
+    const token = await store.update(
+      ctx.req.param("site"),
+      ctx.req.param("id"),
+      {
+        name: body.name,
+        expiresAt: body.expiresAt === undefined
+          ? undefined
+          : parseExpiresAt(body.expiresAt),
+      },
+    );
+    if (token === null) throw tokenNotFound();
+    return ctx.json(token);
+  });
+
+  app.delete("/tokens/:site/:id", async (ctx) => {
+    const deleted = await store.delete(
+      ctx.req.param("site"),
+      ctx.req.param("id"),
+    );
     if (!deleted) throw tokenNotFound();
     return ctx.body(null, STATUS_CODE.NoContent);
   });
 
-  app.get("/verify/:id", async (ctx) => {
+  app.get("/verify/:site/:id", async (ctx) => {
     // 有効性の判定結果が中間キャッシュに残らないようにする
     ctx.header("cache-control", "no-store");
-    return ctx.json(await store.verify(ctx.req.param("id")));
+    return ctx.json(
+      await store.verify(ctx.req.param("site"), ctx.req.param("id")),
+    );
   });
 
   app.notFound((ctx) =>

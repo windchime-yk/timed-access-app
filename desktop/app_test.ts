@@ -5,6 +5,7 @@ import { createDesktopApp } from "./app.tsx";
 
 const sampleToken: TokenRecord = {
   id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  site: "blog",
   name: "テスト",
   createdAt: new Date().toISOString(),
   expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -37,6 +38,7 @@ const postToken = (
       ...headers,
     },
     body: new URLSearchParams({
+      site: "blog",
       name: "テスト",
       expires_at: "2027-01-01T12:00",
     }),
