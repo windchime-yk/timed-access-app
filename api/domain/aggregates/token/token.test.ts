@@ -123,7 +123,7 @@ Deno.test("Token.isExpiredAt: 失効日時ちょうど以降は失効とみな�
   assertEquals(token.isExpiredAt(new Date("2026-07-05T12:00:01Z")), true);
 });
 
-Deno.test("Token.equals: IDが同じなら同一のトークンとみなす", () => {
+Deno.test("Token.equals: サイト名とIDの組が同じなら同一のトークンとみなす", () => {
   const token = Token.restore(PROPS);
 
   assertEquals(token.equals(Token.restore({ ...PROPS, name: "別名" })), true);
@@ -133,6 +133,13 @@ Deno.test("Token.equals: IDが同じなら同一のトークンとみなす", ()
         ...PROPS,
         id: TokenId.from("01ARZ3NDEKTSV4RRFFQ69G5FAW"),
       }),
+    ),
+    false,
+  );
+  // リポジトリはサイト名とIDの組で保存・取得するため、IDが同じでもサイトが違えば別物
+  assertEquals(
+    token.equals(
+      Token.restore({ ...PROPS, site: SiteName.from("other-site") }),
     ),
     false,
   );

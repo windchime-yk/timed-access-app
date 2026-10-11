@@ -100,9 +100,9 @@ for (const { name, open } of implementations) {
       const token = tokenOf("blog", "01ARZ3NDEKTSV4RRFFQ69G5FAV");
       await repo.put(token);
 
-      await repo.delete(token.site, token.id);
+      await repo.delete(token);
       assertEquals(await repo.get(token.site, token.id), null);
-      await repo.delete(token.site, token.id);
+      await repo.delete(token);
     }));
 
   Deno.test(`${name}: listはsite→id昇順で返す`, () =>
