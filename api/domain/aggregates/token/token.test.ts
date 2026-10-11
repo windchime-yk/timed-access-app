@@ -80,6 +80,19 @@ Deno.test("Token.restore: 失効済みでも復元できる", () => {
   );
 });
 
+Deno.test("Token.restore: 日時として不正な値はValidationError", () => {
+  const invalid = new Date("not a date");
+
+  assertThrows(
+    () => Token.restore({ ...PROPS, createdAt: invalid }),
+    ValidationError,
+  );
+  assertThrows(
+    () => Token.restore({ ...PROPS, expiresAt: invalid }),
+    ValidationError,
+  );
+});
+
 Deno.test("Token.restore: 渡した日時を後から書き換えても内部状態は変わらない", () => {
   const createdAt = new Date(PROPS.createdAt);
   const expiresAt = new Date(PROPS.expiresAt);
