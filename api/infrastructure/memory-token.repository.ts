@@ -20,7 +20,7 @@ export class InMemoryTokenRepository implements TokenRepository {
   get(site: SiteName, id: TokenId): Promise<Token | null> {
     const record = this.#records.get(this.#keyOf(site.value, id.value));
     return Promise.resolve(
-      record === undefined ? null : Token.reconstruct(record),
+      record === undefined ? null : Token.restore(record),
     );
   }
 
@@ -30,7 +30,7 @@ export class InMemoryTokenRepository implements TokenRepository {
       .sort((a, b) =>
         a.site === b.site ? compare(a.id, b.id) : compare(a.site, b.site)
       )
-      .map((record) => Token.reconstruct(record));
+      .map((record) => Token.restore(record));
     return Promise.resolve(tokens);
   }
 

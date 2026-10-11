@@ -27,7 +27,7 @@ const implementations: {
 ];
 
 const tokenOf = (site: string, id: string, expiresInMs = 60_000): Token =>
-  Token.reconstruct({
+  Token.restore({
     id,
     site,
     name: `${site}/${id}`,

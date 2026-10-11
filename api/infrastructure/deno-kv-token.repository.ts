@@ -30,14 +30,14 @@ export class DenoKvTokenRepository implements TokenRepository {
       site.value,
       id.value,
     ]);
-    return entry.value === null ? null : Token.reconstruct(entry.value);
+    return entry.value === null ? null : Token.restore(entry.value);
   }
 
   async list(site?: SiteName): Promise<Token[]> {
     const tokens: Token[] = [];
     const prefix = site === undefined ? [KEY_PREFIX] : [KEY_PREFIX, site.value];
     for await (const entry of this.#kv.list<TokenRecord>({ prefix })) {
-      tokens.push(Token.reconstruct(entry.value));
+      tokens.push(Token.restore(entry.value));
     }
     return tokens;
   }

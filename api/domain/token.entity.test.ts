@@ -16,8 +16,8 @@ const RECORD: TokenRecord = {
   expiresAt: "2026-07-05T12:00:00.000Z",
 };
 
-Deno.test("Token.issue: ULIDを発行し、発行日時と失効日時を持つ", () => {
-  const token = Token.issue({
+Deno.test("Token.create: ULIDを発行し、発行日時と失効日時を持つ", () => {
+  const token = Token.create({
     site: SiteName.from("blog"),
     name: " テスト ",
     expiresAt: LATER,
@@ -30,9 +30,9 @@ Deno.test("Token.issue: ULIDを発行し、発行日時と失効日時を持つ"
   assertEquals(token.expiresAt, LATER);
 });
 
-Deno.test("Token.issue: 名前が未指定・空なら既定名になる", () => {
+Deno.test("Token.create: 名前が未指定・空なら既定名になる", () => {
   for (const name of [undefined, "", "   "]) {
-    const token = Token.issue(
+    const token = Token.create(
       { site: SiteName.from("blog"), name, expiresAt: LATER },
       NOW,
     );
@@ -40,41 +40,41 @@ Deno.test("Token.issue: 名前が未指定・空なら既定名になる", () =>
   }
 });
 
-Deno.test("Token.issue: 現在以前の失効日時はRangeError", () => {
+Deno.test("Token.create: 現在以前の失効日時はRangeError", () => {
   for (const expiresAt of [NOW, new Date("2026-07-04T11:59:59Z")]) {
     assertThrows(
-      () => Token.issue({ site: SiteName.from("blog"), expiresAt }, NOW),
+      () => Token.create({ site: SiteName.from("blog"), expiresAt }, NOW),
       RangeError,
     );
   }
 });
 
-Deno.test("Token.reconstruct: 保存済みの値から復元し、toRecordで元に戻る", () => {
-  const token = Token.reconstruct(RECORD);
+Deno.test("Token.restore: 保存済みの値から復元し、toRecordで元に戻る", () => {
+  const token = Token.restore(RECORD);
 
   assertEquals(token.id.value, RECORD.id);
   assertEquals(token.site.value, RECORD.site);
   assertEquals(token.toRecord(), RECORD);
 });
 
-Deno.test("Token.reconstruct: 失効済みでも復元できる", () => {
+Deno.test("Token.restore: 失効済みでも復元できる", () => {
   const expired = { ...RECORD, expiresAt: "2000-01-01T00:00:00.000Z" };
-  assertEquals(Token.reconstruct(expired).toRecord(), expired);
+  assertEquals(Token.restore(expired).toRecord(), expired);
 });
 
-Deno.test("Token.reconstruct: 不正なサイト名・IDはRangeError", () => {
+Deno.test("Token.restore: 不正なサイト名・IDはRangeError", () => {
   assertThrows(
-    () => Token.reconstruct({ ...RECORD, site: "Blog!" }),
+    () => Token.restore({ ...RECORD, site: "Blog!" }),
     RangeError,
   );
   assertThrows(
-    () => Token.reconstruct({ ...RECORD, id: "unknown" }),
+    () => Token.restore({ ...RECORD, id: "unknown" }),
     RangeError,
   );
 });
 
 Deno.test("Token.rename: 表示名を変更し、空なら既定名にする", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
 
   token.rename(" 更新後 ");
   assertEquals(token.name, "更新後");
@@ -84,7 +84,7 @@ Deno.test("Token.rename: 表示名を変更し、空なら既定名にする", (
 });
 
 Deno.test("Token.changeExpiry: 未来の失効日時に変更できる", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
   const next = new Date("2026-07-06T12:00:00Z");
 
   token.changeExpiry(next, NOW);
@@ -92,14 +92,14 @@ Deno.test("Token.changeExpiry: 未来の失効日時に変更できる", () => {
 });
 
 Deno.test("Token.changeExpiry: 現在以前の失効日時はRangeErrorで、値は変わらない", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
 
   assertThrows(() => token.changeExpiry(NOW, NOW), RangeError);
   assertEquals(token.toRecord(), RECORD);
 });
 
 Deno.test("Token.isExpiredAt: 失効日時ちょうど以降は失効とみなす", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
 
   assertEquals(token.isExpiredAt(new Date("2026-07-05T11:59:59Z")), false);
   assertEquals(token.isExpiredAt(new Date("2026-07-05T12:00:00Z")), true);
@@ -107,22 +107,22 @@ Deno.test("Token.isExpiredAt: 失効日時ちょうど以降は失効とみな�
 });
 
 Deno.test("Token.equals: IDが同じなら同一のトークンとみなす", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
 
   assertEquals(
-    token.equals(Token.reconstruct({ ...RECORD, name: "別名" })),
+    token.equals(Token.restore({ ...RECORD, name: "別名" })),
     true,
   );
   assertEquals(
     token.equals(
-      Token.reconstruct({ ...RECORD, id: "01ARZ3NDEKTSV4RRFFQ69G5FAW" }),
+      Token.restore({ ...RECORD, id: "01ARZ3NDEKTSV4RRFFQ69G5FAW" }),
     ),
     false,
   );
 });
 
 Deno.test("Token: 取得した日時を書き換えても内部状態は変わらない", () => {
-  const token = Token.reconstruct(RECORD);
+  const token = Token.restore(RECORD);
 
   token.expiresAt.setFullYear(2000);
   token.createdAt.setFullYear(2000);

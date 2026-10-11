@@ -21,7 +21,7 @@ export class TokenService {
   async create(
     input: { site: string; name?: string; expiresAt: Date },
   ): Promise<Token> {
-    const token = Token.issue({
+    const token = Token.create({
       site: SiteName.from(input.site),
       name: input.name,
       expiresAt: input.expiresAt,

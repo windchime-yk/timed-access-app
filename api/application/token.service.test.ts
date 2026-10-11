@@ -36,7 +36,7 @@ const seedExpiredToken = async (
     createdAt: new Date(Date.now() - 120_000).toISOString(),
     expiresAt: new Date(Date.now() - 60_000).toISOString(),
   };
-  await repo.put(Token.reconstruct(expired));
+  await repo.put(Token.restore(expired));
   return expired;
 };
 

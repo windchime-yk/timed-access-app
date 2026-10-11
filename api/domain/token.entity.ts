@@ -41,12 +41,12 @@ export class Token {
   }
 
   /**
-   * 新しいトークンを発行する
+   * 新しいトークンを作成する（IDは新しく発行する）
    * @param input サイト名・表示名・失効日時
    * @param now 発行日時
    * @throws {RangeError} 失効日時が現在以前の場合
    */
-  static issue(
+  static create(
     input: { site: SiteName; name?: string; expiresAt: Date },
     now = new Date(),
   ): Token {
@@ -65,7 +65,7 @@ export class Token {
    * @param record 永続化された値
    * @throws {RangeError} サイト名・IDが不正な場合
    */
-  static reconstruct(record: TokenRecord): Token {
+  static restore(record: TokenRecord): Token {
     return new Token(
       TokenId.from(record.id),
       SiteName.from(record.site),
