@@ -58,9 +58,12 @@ api/domain/
   へ移して共有します
 - サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
   ドメインに入ることはありません
-- APIの入出力（`TokenRecord`）との変換は、次の2箇所で行います
-  - presentation層：レスポンス時の `toRecord()`
-  - リポジトリの実装：保存時の `toRecord()`、読み込み時の `Token.restore()`
+- Entityは application層の外へ出しません。`TokenService`
+  は、Entityの操作を持たない プレーンな値 `TokenDto` を返します
+  - presentation層は、`TokenDto` がAPIの契約（`TokenRecord` /
+    `VerifyResult`）と一致することを型で確かめてから返します
+  - リポジトリの実装は、保存時に `toRecord()`、読み込み時に `Token.restore()`
+    で変換します
 
 新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に
 `TokenRepository` の実装を追加し、`infrastructure/token.repository.test.ts` の

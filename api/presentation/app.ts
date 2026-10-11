@@ -3,7 +3,12 @@ import type { Context } from "@hono/hono";
 import { cors } from "@hono/hono/cors";
 import { HTTPException } from "@hono/hono/http-exception";
 import { STATUS_CODE } from "@std/http/status";
-import type { TokenCreateInput, TokenUpdateInput } from "../../shared/mod.ts";
+import type {
+  TokenCreateInput,
+  TokenRecord,
+  TokenUpdateInput,
+  VerifyResult,
+} from "../../shared/mod.ts";
 import { ValidationError } from "../application/errors.ts";
 import type { TokenService } from "../application/token.service.ts";
 import { requireApiKey } from "./middleware/api-key.ts";
@@ -75,18 +80,18 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
       name: body.name,
       expiresAt: parseExpiresAt(body.expiresAt),
     });
-    return ctx.json(token, STATUS_CODE.Created);
+    return ctx.json(token satisfies TokenRecord, STATUS_CODE.Created);
   });
 
   app.get("/tokens", async (ctx) => {
     const tokens = await service.list(ctx.req.query("site"));
-    return ctx.json({ tokens });
+    return ctx.json({ tokens } satisfies { tokens: TokenRecord[] });
   });
 
   app.get("/tokens/:site/:id", async (ctx) => {
     const token = await service.get(ctx.req.param("site"), ctx.req.param("id"));
     if (token === null) throw tokenNotFound();
-    return ctx.json(token);
+    return ctx.json(token satisfies TokenRecord);
   });
 
   app.patch("/tokens/:site/:id", async (ctx) => {
@@ -102,7 +107,7 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
       },
     );
     if (token === null) throw tokenNotFound();
-    return ctx.json(token);
+    return ctx.json(token satisfies TokenRecord);
   });
 
   app.delete("/tokens/:site/:id", async (ctx) => {
@@ -117,9 +122,11 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
   app.get("/verify/:site/:id", async (ctx) => {
     // 有効性の判定結果が中間キャッシュに残らないようにする
     ctx.header("cache-control", "no-store");
-    return ctx.json(
-      await service.verify(ctx.req.param("site"), ctx.req.param("id")),
+    const result = await service.verify(
+      ctx.req.param("site"),
+      ctx.req.param("id"),
     );
+    return ctx.json(result satisfies VerifyResult);
   });
 
   app.notFound((ctx) =>
