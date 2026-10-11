@@ -1,7 +1,7 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { Hono } from "@hono/hono";
 import { HTTPException } from "@hono/hono/http-exception";
-import { rateLimit, type RateLimitOptions } from "./rate_limit.ts";
+import { rateLimit, type RateLimitOptions } from "./rate-limit.ts";
 
 /** レート制限だけを適用した最小のアプリを作る */
 const createLimitedApp = (options: RateLimitOptions) => {

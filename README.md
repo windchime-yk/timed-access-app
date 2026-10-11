@@ -8,14 +8,73 @@ Deno Workspaceで3つのパッケージを管理しています。
 
 | ディレクトリ | 役割                                                                |
 | ------------ | ------------------------------------------------------------------- |
-| `api/`       | トークンの発行・検証API（Hono + Deno KV + `@std/ulid`）             |
+| `api/`       | トークンの発行・検証API（Hono + `@std/ulid`、永続化は Deno KV）     |
 | `desktop/`   | CRUD用デスクトップアプリ（Hono + hono/jsx、`deno desktop`でビルド） |
 | `shared/`    | 型と定数の共有パッケージ                                            |
 
-- ULIDは `@std/ulid` で生成し、Deno KVの `expireIn`
+- ULIDは `@std/ulid` で生成し、失効日時を過ぎたトークンは無効として扱われます。
+  現在の永続化先は Deno KV で、`expireIn`
   により失効日時ちょうどにレコードが自動削除されます
 - トークンはサイト名（英小文字・数字・ハイフンのスラッグ）ごとに保存・検証されます
 - 依存関係はすべてJSRから取得しています
+
+### APIの層構成
+
+`api/` は永続化先を差し替えられるよう、次の4層に分けています。
+
+| ディレクトリ          | 役割                                                      |
+| --------------------- | --------------------------------------------------------- |
+| `api/domain/`         | Aggregate・値オブジェクト・リポジトリのインターフェース   |
+| `api/application/`    | `TokenService`。発行・取得・更新・削除・検証の流れ        |
+| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ） |
+| `api/presentation/`   | Honoのルーティング・入力検証・ミドルウェア（HTTPの入口）  |
+| `api/main.ts`         | 各層を組み立ててサーバーを起動する                        |
+
+`presentation/` の構成:
+
+- 入口は今のところHTTPだけのため、直下にHonoのアプリを置いています
+- CLIやキューのコンシューマなど別の入口が増えたら、入口ごとにディレクトリを分けます
+  （例 `presentation/http/`、`presentation/cli/`）
+
+`api/domain/` はAggregate単位でディレクトリを分けています。
+
+```
+api/domain/
+  aggregates/
+    token/                  # Token Aggregate
+      token.ts              # ルートEntity
+      token.repository.ts   # Aggregate単位のリポジトリ（インターフェース）
+      value-objects/        # このAggregateで使う値オブジェクト
+        site-name.ts
+        token-id.ts
+  shared/
+    value-object.ts         # 値オブジェクトの基底クラス
+    validation.error.ts     # ドメインのルール違反を表すエラー
+```
+
+- トークンのルール（失効日時は未来であること、表示名の既定値、失効の判定）は
+  ルートEntity `Token` が持ち、状態の変更は `rename` / `changeExpiry`
+  などのメソッド経由に限ります
+- 値オブジェクトを複数のAggregateで使うようになったら、`domain/value-objects/`
+  へ移して共有します
+- サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
+  ドメインに入ることはありません
+- ルール違反は `ValidationError` で表し、presentation層はこれだけを400にします
+- リポジトリはAggregate単位で保存・削除し、トークンをサイト名とIDの組で識別します。
+  `Token.equals` も同じ基準で同一性を判定します
+
+層の間では、次の値で受け渡します。Entityはdomain・application・infrastructureの
+中だけで扱い、APIの契約（`shared/mod.ts`）に依存するのはpresentation層だけです。
+
+| 境界                        | 受け渡す値                                       | 変換する場所                                           |
+| --------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| presentation ↔ application  | `TokenDto`（Entityの操作を持たないプレーンな値） | `application/token.dto.ts` の `toTokenDto`             |
+| presentation → クライアント | `TokenRecord` / `VerifyResult`（APIの契約）      | 変換なし。`satisfies` で `TokenDto` との一致を確かめる |
+| infrastructure ↔ 永続化先   | `StoredToken`（保存形式）                        | `infrastructure/stored-token.mapper.ts`                |
+
+新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に
+`TokenRepository` の実装を追加し、`infrastructure/token.repository.test.ts` の
+契約テスト対象に加えたうえで `main.ts` で差し替えます。
 
 ## セットアップ
 
@@ -177,6 +236,18 @@ if (valid) {
     の値は各プロキシが右へ追記するため、末尾から段数ぶんさかのぼった
     IPを採用する（先頭側はクライアントが偽装できるため使わない）。直接公開時は設定しないでください
 - カウントはプロセス内メモリ管理のため、再起動でリセットされ、複数インスタンス構成ではインスタンスごとに独立します
+
+### エラーレスポンス
+
+エラーは `{ "status": number, "message": string }` の形で返します。
+
+| ステータス | 条件                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| 400        | JSONとして解釈できない、または入力がルールに反する（サイト名の形式、過去の失効日時など） |
+| 401        | `/tokens` 配下でAPIキーが無い・誤っている                                                |
+| 404        | トークンが存在しない・失効済み、またはエンドポイントが存在しない                         |
+| 429        | `/verify` のレート制限を超えた                                                           |
+| 500        | 上記以外（保存データの破損など、サーバー側の問題）。サーバーのログに記録されます         |
 
 `TokenRecord` の形は次のとおりです。
 

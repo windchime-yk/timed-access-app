@@ -1,5 +1,6 @@
-import { createApp } from "./app.ts";
-import { TokenStore } from "./store.ts";
+import { TokenService } from "./application/token.service.ts";
+import { DenoKvTokenRepository } from "./infrastructure/deno-kv-token.repository.ts";
+import { createApp } from "./presentation/app.ts";
 
 /**
  * 環境変数を正の整数として読み、不正・未設定なら既定値を返す
@@ -18,7 +19,7 @@ const positiveIntEnv = (name: string, fallback: number): number => {
 };
 
 const kv = await Deno.openKv(Deno.env.get("KV_PATH"));
-const app = createApp(new TokenStore(kv), {
+const app = createApp(new TokenService(new DenoKvTokenRepository(kv)), {
   verifyRateLimit: {
     limit: positiveIntEnv("VERIFY_RATE_LIMIT", 60),
     windowMs: 60_000,

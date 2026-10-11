@@ -4,9 +4,11 @@ import {
   API_KEY_HEADER,
   type TokenRecord,
   type VerifyResult,
-} from "../shared/mod.ts";
+} from "../../shared/mod.ts";
+import { TokenService } from "../application/token.service.ts";
+import { CorruptedStoredTokenError } from "../infrastructure/corrupted-stored-token.error.ts";
+import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { createApp } from "./app.ts";
-import { TokenStore } from "./store.ts";
 
 const API_KEY = "test-api-key";
 const AUTH_HEADERS = { [API_KEY_HEADER]: API_KEY };
@@ -17,13 +19,10 @@ const withApp = async (
   fn: (app: ReturnType<typeof createApp>) => Promise<void>,
   options?: Parameters<typeof createApp>[1],
 ) => {
-  const kv = await Deno.openKv(":memory:");
   Deno.env.set(API_KEY_ENV, API_KEY);
-  try {
-    await fn(createApp(new TokenStore(kv), options));
-  } finally {
-    kv.close();
-  }
+  await fn(
+    createApp(new TokenService(new InMemoryTokenRepository()), options),
+  );
 };
 
 const createToken = async (
@@ -237,3 +236,79 @@ Deno.test("GET /verify/:site/:id: レート制限を超えると429を返す", (
     assertEquals(list.status, 200);
     await list.body?.cancel();
   }, { verifyRateLimit: { limit: 2, windowMs: 60_000 } }));
+
+Deno.test("エラー: 保存データの破損など入力以外のエラーは500で返す", async () => {
+  /** 一覧の取得で、壊れた保存データを復元したときの例外を再現する */
+  class BrokenRepository extends InMemoryTokenRepository {
+    override list(): Promise<never> {
+      return Promise.reject(
+        new CorruptedStoredTokenError("保存データが壊れています"),
+      );
+    }
+  }
+  Deno.env.set(API_KEY_ENV, API_KEY);
+  const app = createApp(new TokenService(new BrokenRepository()));
+
+  const res = await app.request("/tokens", { headers: AUTH_HEADERS });
+  assertEquals(res.status, 500);
+  await res.body?.cancel();
+});
+
+/** 400のレスポンスからメッセージを取り出す */
+const badRequestMessage = async (res: Response): Promise<string> => {
+  assertEquals(res.status, 400);
+  const body: { message: string } = await res.json();
+  return body.message;
+};
+
+Deno.test("入力のルール違反はドメインのメッセージで400を返す", () =>
+  withApp(async (app) => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const siteMessage =
+      "サイト名は英小文字・数字・ハイフン1〜64文字で指定してください";
+    const expiryMessage = "失効日時は未来の日時を指定してください";
+
+    // サイト名の形式（発行・一覧の絞り込み）
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens", {
+          method: "POST",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ site: "Blog!", expiresAt: future }),
+        }),
+      ),
+      siteMessage,
+    );
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens?site=Blog!", { headers: AUTH_HEADERS }),
+      ),
+      siteMessage,
+    );
+
+    // 過去の失効日時（発行・更新）
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens", {
+          method: "POST",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            site: SITE,
+            expiresAt: "2000-01-01T00:00:00Z",
+          }),
+        }),
+      ),
+      expiryMessage,
+    );
+    const token = await createToken(app, new Date(Date.now() + 60_000));
+    assertEquals(
+      await badRequestMessage(
+        await app.request(`/tokens/${SITE}/${token.id}`, {
+          method: "PATCH",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expiresAt: "2000-01-01T00:00:00Z" }),
+        }),
+      ),
+      expiryMessage,
+    );
+  }));
