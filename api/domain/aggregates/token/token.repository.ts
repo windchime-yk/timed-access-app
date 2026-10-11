@@ -3,8 +3,10 @@ import type { TokenId } from "./value-objects/token-id.ts";
 import type { Token } from "./token.ts";
 
 /**
- * トークンの永続化インターフェース
+ * Token Aggregateの永続化インターフェース
  *
+ * 保存・削除はAggregate（Token）単位で行い、トークンはサイト名とIDの組で識別する
+ * （`Token.equals` と同じ基準）。
  * 失効済みのトークンを返す場合があるため、失効の判定は呼び出し側で行う。
  * TTLなどの自動削除は `token.expiresAt` をもとに各実装が設定する。
  */

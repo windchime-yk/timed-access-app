@@ -60,6 +60,8 @@ api/domain/
 - サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
   ドメインに入ることはありません
 - ルール違反は `ValidationError` で表し、presentation層はこれだけを400にします
+- リポジトリはAggregate単位で保存・削除し、トークンをサイト名とIDの組で識別します。
+  `Token.equals` も同じ基準で同一性を判定します
 
 層の間では、次の値で受け渡します。Entityはdomain・application・infrastructureの
 中だけで扱い、APIの契約（`shared/mod.ts`）に依存するのはpresentation層だけです。
