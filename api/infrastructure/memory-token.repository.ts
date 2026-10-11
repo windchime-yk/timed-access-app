@@ -38,8 +38,8 @@ export class InMemoryTokenRepository implements TokenRepository {
     return Promise.resolve(tokens);
   }
 
-  delete(site: SiteName, id: TokenId): Promise<void> {
-    this.#records.delete(this.#keyOf(site.value, id.value));
+  delete(token: Token): Promise<void> {
+    this.#records.delete(this.#keyOf(token.site.value, token.id.value));
     return Promise.resolve();
   }
 }

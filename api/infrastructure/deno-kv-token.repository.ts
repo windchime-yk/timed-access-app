@@ -46,7 +46,7 @@ export class DenoKvTokenRepository implements TokenRepository {
     return tokens;
   }
 
-  async delete(site: SiteName, id: TokenId): Promise<void> {
-    await this.#kv.delete([KEY_PREFIX, site.value, id.value]);
+  async delete(token: Token): Promise<void> {
+    await this.#kv.delete([KEY_PREFIX, token.site.value, token.id.value]);
   }
 }

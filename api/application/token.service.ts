@@ -94,7 +94,7 @@ export class TokenService {
     const token = await this.#find(site, id);
     if (token === null) return false;
 
-    await this.#repo.delete(token.site, token.id);
+    await this.#repo.delete(token);
     return true;
   }
 

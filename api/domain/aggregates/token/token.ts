@@ -120,8 +120,8 @@ export class Token {
     return this.#expiresAt.getTime() <= now.getTime();
   }
 
-  /** IDが同じなら同一のトークンとみなす */
+  /** サイト名とIDの組が同じなら同一のトークンとみなす（リポジトリのキーと揃える） */
   equals(other: Token): boolean {
-    return this.id.equals(other.id);
+    return this.site.equals(other.site) && this.id.equals(other.id);
   }
 }

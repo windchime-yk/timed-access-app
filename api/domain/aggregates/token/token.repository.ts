@@ -32,8 +32,7 @@ export interface TokenRepository {
 
   /**
    * トークンを削除する（存在しなければ何もしない）
-   * @param site トークンが属するサイト名
-   * @param id トークンのULID
+   * @param token 削除するトークン
    */
-  delete(site: SiteName, id: TokenId): Promise<void>;
+  delete(token: Token): Promise<void>;
 }
