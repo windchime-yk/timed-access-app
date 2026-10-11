@@ -5,7 +5,7 @@ import {
   assertRejects,
 } from "@std/assert";
 import type { TokenRecord } from "../../shared/mod.ts";
-import type { Token } from "../domain/token.entity.ts";
+import { Token } from "../domain/token.entity.ts";
 import type { TokenRepository } from "../domain/token.repository.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { TokenService } from "./token.service.ts";
@@ -36,7 +36,7 @@ const seedExpiredToken = async (
     createdAt: new Date(Date.now() - 120_000).toISOString(),
     expiresAt: new Date(Date.now() - 60_000).toISOString(),
   };
-  await repo.put(expired);
+  await repo.put(Token.reconstruct(expired));
   return expired;
 };
 
