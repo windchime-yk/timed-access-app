@@ -1,4 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
+import { ValidationError } from "../../../shared/validation.error.ts";
 import { SiteName } from "./site-name.ts";
 
 Deno.test("SiteName.from: 英小文字・数字・ハイフン1〜64文字を受け付ける", () => {
@@ -7,13 +8,13 @@ Deno.test("SiteName.from: 英小文字・数字・ハイフン1〜64文字を受
   }
 });
 
-Deno.test("SiteName.from: 不正な値はRangeError", () => {
+Deno.test("SiteName.from: 不正な値はValidationError", () => {
   for (
     const value of [undefined, 1, "", "Blog", "日本語", "a b", "a".repeat(65)]
   ) {
     assertThrows(
       () => SiteName.from(value),
-      RangeError,
+      ValidationError,
       undefined,
       String(value),
     );

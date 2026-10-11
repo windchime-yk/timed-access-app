@@ -1,4 +1,5 @@
 import { assertEquals, assertMatch, assertThrows } from "@std/assert";
+import { ValidationError } from "../../../shared/validation.error.ts";
 import { TokenId } from "./token-id.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -17,7 +18,7 @@ Deno.test("TokenId.from: ULIDを受け付ける", () => {
   assertEquals(TokenId.from(value).value, value);
 });
 
-Deno.test("TokenId.from: ULIDでない値はRangeError", () => {
+Deno.test("TokenId.from: ULIDでない値はValidationError", () => {
   for (
     const value of [
       undefined,
@@ -32,7 +33,7 @@ Deno.test("TokenId.from: ULIDでない値はRangeError", () => {
   ) {
     assertThrows(
       () => TokenId.from(value),
-      RangeError,
+      ValidationError,
       undefined,
       String(value),
     );

@@ -1,6 +1,7 @@
 import { assertEquals, assertMatch, assertThrows } from "@std/assert";
 import type { TokenRecord } from "../../../../shared/mod.ts";
 import { SiteName } from "./value-objects/site-name.ts";
+import { ValidationError } from "../../shared/validation.error.ts";
 import { Token } from "./token.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -40,11 +41,11 @@ Deno.test("Token.create: 名前が未指定・空なら既定名になる", () =
   }
 });
 
-Deno.test("Token.create: 現在以前の失効日時はRangeError", () => {
+Deno.test("Token.create: 現在以前の失効日時はValidationError", () => {
   for (const expiresAt of [NOW, new Date("2026-07-04T11:59:59Z")]) {
     assertThrows(
       () => Token.create({ site: SiteName.from("blog"), expiresAt }, NOW),
-      RangeError,
+      ValidationError,
     );
   }
 });
@@ -62,14 +63,14 @@ Deno.test("Token.restore: 失効済みでも復元できる", () => {
   assertEquals(Token.restore(expired).toRecord(), expired);
 });
 
-Deno.test("Token.restore: 不正なサイト名・IDはRangeError", () => {
+Deno.test("Token.restore: 不正なサイト名・IDはValidationError", () => {
   assertThrows(
     () => Token.restore({ ...RECORD, site: "Blog!" }),
-    RangeError,
+    ValidationError,
   );
   assertThrows(
     () => Token.restore({ ...RECORD, id: "unknown" }),
-    RangeError,
+    ValidationError,
   );
 });
 
@@ -91,10 +92,10 @@ Deno.test("Token.changeExpiry: 未来の失効日時に変更できる", () => {
   assertEquals(token.expiresAt, next);
 });
 
-Deno.test("Token.changeExpiry: 現在以前の失効日時はRangeErrorで、値は変わらない", () => {
+Deno.test("Token.changeExpiry: 現在以前の失効日時はValidationErrorで、値は変わらない", () => {
   const token = Token.restore(RECORD);
 
-  assertThrows(() => token.changeExpiry(NOW, NOW), RangeError);
+  assertThrows(() => token.changeExpiry(NOW, NOW), ValidationError);
   assertEquals(token.toRecord(), RECORD);
 });
 

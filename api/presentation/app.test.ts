@@ -235,3 +235,18 @@ Deno.test("GET /verify/:site/:id: レート制限を超えると429を返す", (
     assertEquals(list.status, 200);
     await list.body?.cancel();
   }, { verifyRateLimit: { limit: 2, windowMs: 60_000 } }));
+
+Deno.test("エラー: 保存データの破損など入力以外のエラーは500で返す", async () => {
+  /** 一覧の取得で、壊れた保存データを復元したときの例外を再現する */
+  class BrokenRepository extends InMemoryTokenRepository {
+    override list(): Promise<never> {
+      return Promise.reject(new RangeError("保存データが壊れています"));
+    }
+  }
+  Deno.env.set(API_KEY_ENV, API_KEY);
+  const app = createApp(new TokenService(new BrokenRepository()));
+
+  const res = await app.request("/tokens", { headers: AUTH_HEADERS });
+  assertEquals(res.status, 500);
+  await res.body?.cancel();
+});

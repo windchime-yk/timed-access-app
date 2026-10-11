@@ -8,6 +8,7 @@ import type { TokenRecord } from "../../shared/mod.ts";
 import { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
+import { ValidationError } from "./errors.ts";
 import { TokenService } from "./token.service.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -76,7 +77,7 @@ Deno.test("create: 過去の失効日時では発行できない", () =>
           site: SITE,
           expiresAt: new Date(Date.now() - 1_000),
         }),
-      RangeError,
+      ValidationError,
     );
   }));
 
@@ -88,7 +89,7 @@ Deno.test("create: 不正なサイト名では発行できない", () =>
           site: "Blog!",
           expiresAt: new Date(Date.now() + 60_000),
         }),
-      RangeError,
+      ValidationError,
     );
   }));
 
@@ -136,9 +137,9 @@ Deno.test("list: サイトを指定するとそのサイトのトークンのみ
     assertEquals(await service.list("unknown"), []);
   }));
 
-Deno.test("list: 不正なサイト名はRangeError", () =>
+Deno.test("list: 不正なサイト名はValidationError", () =>
   withService(async (service) => {
-    await assertRejects(() => service.list("Blog!"), RangeError);
+    await assertRejects(() => service.list("Blog!"), ValidationError);
   }));
 
 Deno.test("get: 失効済みトークンはnullを返す", () =>
@@ -230,7 +231,7 @@ Deno.test("update: 過去の失効日時には更新できない", () =>
         service.update(SITE, token.id.value, {
           expiresAt: new Date(Date.now() - 1_000),
         }),
-      RangeError,
+      ValidationError,
     );
   }));
 
