@@ -18,7 +18,17 @@ const assertFutureExpiry = (expiresAt: Date, now: Date): void => {
   }
 };
 
-/** 時限式トークン（Token Aggregateのルート）。IDで同一性を判定し、状態の変更はメソッド経由に限る */
+/**
+ * 日時として有効な値であることを確かめる
+ * @throws {ValidationError} Invalid Dateの場合
+ */
+const assertValidDate = (date: Date): void => {
+  if (Number.isNaN(date.getTime())) {
+    throw new ValidationError("日時として不正な値は復元できません");
+  }
+};
+
+/** 時限式トークン（Token Aggregateのルート）。サイト名とIDの組で同一性を判定し、状態の変更はメソッド経由に限る */
 export class Token {
   readonly id: TokenId;
   readonly site: SiteName;
@@ -72,11 +82,8 @@ export class Token {
     createdAt: Date;
     expiresAt: Date;
   }): Token {
-    for (const date of [props.createdAt, props.expiresAt]) {
-      if (Number.isNaN(date.getTime())) {
-        throw new ValidationError("日時として不正な値は復元できません");
-      }
-    }
+    assertValidDate(props.createdAt);
+    assertValidDate(props.expiresAt);
     return new Token(
       props.id,
       props.site,
