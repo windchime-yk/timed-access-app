@@ -1,4 +1,6 @@
-import type { Token } from "./token.ts";
+import type { SiteName } from "./site-name.value-object.ts";
+import type { TokenId } from "./token-id.value-object.ts";
+import type { Token } from "./token.entity.ts";
 
 /**
  * トークンの永続化インターフェース
@@ -19,19 +21,19 @@ export interface TokenRepository {
    * @param id トークンのULID
    * @returns トークン。存在しなければ null
    */
-  get(site: string, id: string): Promise<Token | null>;
+  get(site: SiteName, id: TokenId): Promise<Token | null>;
 
   /**
    * トークンをサイト名→ID（ULID）の昇順で列挙する
    * @param site 指定した場合は完全一致するサイトのトークンのみ
    * @returns トークンの一覧
    */
-  list(site?: string): Promise<Token[]>;
+  list(site?: SiteName): Promise<Token[]>;
 
   /**
    * トークンを削除する（存在しなければ何もしない）
    * @param site トークンが属するサイト名
    * @param id トークンのULID
    */
-  delete(site: string, id: string): Promise<void>;
+  delete(site: SiteName, id: TokenId): Promise<void>;
 }

@@ -27,7 +27,7 @@ export class TokenService {
       expiresAt: input.expiresAt,
     });
 
-    await this.#repo.put(token.toRecord());
+    await this.#repo.put(token);
 
     return token;
   }
@@ -40,11 +40,9 @@ export class TokenService {
    */
   async list(site?: string): Promise<Token[]> {
     const siteName = site === undefined ? undefined : SiteName.from(site);
-    const records = await this.#repo.list(siteName?.value);
+    const tokens = await this.#repo.list(siteName);
     // 永続化先の自動削除は失効直後に反映されない場合があるため日時でも判定
-    return records
-      .map((record) => Token.reconstruct(record))
-      .filter((token) => !token.isExpiredAt());
+    return tokens.filter((token) => !token.isExpiredAt());
   }
 
   /**
@@ -58,11 +56,9 @@ export class TokenService {
     const tokenId = TokenId.tryFrom(id);
     if (siteName === null || tokenId === null) return null;
 
-    const record = await this.#repo.get(siteName.value, tokenId.value);
-    if (record === null) return null;
-
-    const token = Token.reconstruct(record);
-    return token.isExpiredAt() ? null : token;
+    const token = await this.#repo.get(siteName, tokenId);
+    if (token === null || token.isExpiredAt()) return null;
+    return token;
   }
 
   /**
@@ -84,7 +80,7 @@ export class TokenService {
     // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
     if (patch.name !== undefined) token.rename(patch.name);
     if (patch.expiresAt !== undefined) token.changeExpiry(patch.expiresAt);
-    await this.#repo.put(token.toRecord());
+    await this.#repo.put(token);
 
     return token;
   }
@@ -99,7 +95,7 @@ export class TokenService {
     const token = await this.get(site, id);
     if (token === null) return false;
 
-    await this.#repo.delete(token.site.value, token.id.value);
+    await this.#repo.delete(token.site, token.id);
     return true;
   }
 
