@@ -4,59 +4,34 @@ import {
   assertNotEquals,
   assertRejects,
 } from "@std/assert";
-import type { TokenRecord } from "../shared/mod.ts";
-import { isExpired, TokenStore } from "./store.ts";
+import type { Token } from "../domain/token.ts";
+import type { TokenRepository } from "../domain/token.repository.ts";
+import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
+import { TokenService } from "./token.service.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const SITE = "blog";
 
 const withStore = async (
-  fn: (store: TokenStore, kv: Deno.Kv) => Promise<void>,
+  fn: (store: TokenService, repo: TokenRepository) => Promise<void>,
 ) => {
-  const kv = await Deno.openKv(":memory:");
-  try {
-    await fn(new TokenStore(kv), kv);
-  } finally {
-    kv.close();
-  }
+  const repo = new InMemoryTokenRepository();
+  await fn(new TokenService(repo), repo);
 };
 
-/** 失効済みトークンをKVへ直接書き込む（自動削除を経由しない失効状態の再現） */
-const seedExpiredToken = async (kv: Deno.Kv): Promise<TokenRecord> => {
-  const expired: TokenRecord = {
+/** 失効済みトークンをリポジトリへ直接書き込む（自動削除を経由しない失効状態の再現） */
+const seedExpiredToken = async (repo: TokenRepository): Promise<Token> => {
+  const expired: Token = {
     id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     site: SITE,
     name: "期限切れ",
     createdAt: new Date(Date.now() - 120_000).toISOString(),
     expiresAt: new Date(Date.now() - 60_000).toISOString(),
   };
-  await kv.set(["tokens", expired.site, expired.id], expired);
+  await repo.put(expired);
   return expired;
 };
-
-Deno.test("isExpired: 失効日時を過ぎたトークンをtrueと判定する", () => {
-  const base = {
-    id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    site: SITE,
-    name: "テスト",
-    createdAt: new Date().toISOString(),
-  };
-  const now = new Date("2026-07-04T12:00:00Z");
-
-  assertEquals(
-    isExpired({ ...base, expiresAt: "2026-07-04T11:59:59Z" }, now),
-    true,
-  );
-  assertEquals(
-    isExpired({ ...base, expiresAt: "2026-07-04T12:00:00Z" }, now),
-    true,
-  );
-  assertEquals(
-    isExpired({ ...base, expiresAt: "2026-07-04T12:00:01Z" }, now),
-    false,
-  );
-});
 
 Deno.test("create: ULIDと失効日時を持つトークンをサイト配下に発行する", () =>
   withStore(async (store) => {
@@ -89,8 +64,8 @@ Deno.test("create: 過去の失効日時では発行できない", () =>
   }));
 
 Deno.test("list: 有効なトークンのみを作成順で返す", () =>
-  withStore(async (store, kv) => {
-    await seedExpiredToken(kv);
+  withStore(async (store, repo) => {
+    await seedExpiredToken(repo);
     const first = await store.create({
       site: SITE,
       name: "1つ目",
@@ -123,8 +98,8 @@ Deno.test("list: サイトを指定するとそのサイトのトークンのみ
   }));
 
 Deno.test("get: 失効済みトークンはnullを返す", () =>
-  withStore(async (store, kv) => {
-    const expired = await seedExpiredToken(kv);
+  withStore(async (store, repo) => {
+    const expired = await seedExpiredToken(repo);
     assertEquals(await store.get(SITE, expired.id), null);
   }));
 
@@ -138,7 +113,7 @@ Deno.test("get: サイトが異なるとnullを返す", () =>
   }));
 
 Deno.test("update: 表示名と失効日時を更新し、失効済みには適用しない", () =>
-  withStore(async (store, kv) => {
+  withStore(async (store, repo) => {
     const token = await store.create({
       site: SITE,
       name: "更新前",
@@ -154,7 +129,7 @@ Deno.test("update: 表示名と失効日時を更新し、失効済みには適�
     assertEquals(updated?.expiresAt, newExpiresAt.toISOString());
     assertNotEquals(updated?.expiresAt, token.expiresAt);
 
-    const expired = await seedExpiredToken(kv);
+    const expired = await seedExpiredToken(repo);
     assertEquals(await store.update(SITE, expired.id, { name: "無効" }), null);
   }));
 
@@ -209,12 +184,12 @@ Deno.test("delete: トークンを失効させ、二重削除はfalseを返す",
   }));
 
 Deno.test("verify: 有効ならトークン付き、無効ならvalid: falseを返す", () =>
-  withStore(async (store, kv) => {
+  withStore(async (store, repo) => {
     const token = await store.create({
       site: SITE,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    const expired = await seedExpiredToken(kv);
+    const expired = await seedExpiredToken(repo);
 
     assertEquals(await store.verify(SITE, token.id), { valid: true, token });
     assertEquals(await store.verify(SITE, expired.id), { valid: false });

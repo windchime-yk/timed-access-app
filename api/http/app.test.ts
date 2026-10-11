@@ -4,9 +4,10 @@ import {
   API_KEY_HEADER,
   type TokenRecord,
   type VerifyResult,
-} from "../shared/mod.ts";
+} from "../../shared/mod.ts";
+import { TokenService } from "../application/token.service.ts";
+import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { createApp } from "./app.ts";
-import { TokenStore } from "./store.ts";
 
 const API_KEY = "test-api-key";
 const AUTH_HEADERS = { [API_KEY_HEADER]: API_KEY };
@@ -17,13 +18,10 @@ const withApp = async (
   fn: (app: ReturnType<typeof createApp>) => Promise<void>,
   options?: Parameters<typeof createApp>[1],
 ) => {
-  const kv = await Deno.openKv(":memory:");
   Deno.env.set(API_KEY_ENV, API_KEY);
-  try {
-    await fn(createApp(new TokenStore(kv), options));
-  } finally {
-    kv.close();
-  }
+  await fn(
+    createApp(new TokenService(new InMemoryTokenRepository()), options),
+  );
 };
 
 const createToken = async (
