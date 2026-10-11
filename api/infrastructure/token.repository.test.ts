@@ -135,14 +135,28 @@ for (const { name, open } of implementations) {
       assertEquals(await repo.list(site("blo")), []);
     }));
 
-  Deno.test(`${name}: 失効済みトークンも保存でき、除外は呼び出し側に任せる`, () =>
+  Deno.test(`${name}: 失効済みトークンのputは失敗せず、取得で返っても失効済みと判定できる`, () =>
     withRepo(async (repo) => {
       const expired = tokenOf("blog", "01ARZ3NDEKTSV4RRFFQ69G5FAV", -60_000);
       await repo.put(expired);
 
+      // 返すかどうかは実装次第（TTLの反映の遅れなど）。返す場合は失効済みのまま
+      const found = await repo.get(expired.site, expired.id);
+      assertEquals(found === null || found.isExpiredAt(), true);
+    }));
+
+  Deno.test(`${name}: 有効なトークンを失効済みで上書きすると、有効な値は残らない`, () =>
+    withRepo(async (repo) => {
+      const valid = tokenOf("blog", "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+      await repo.put(valid);
+      const expired = tokenOf("blog", "01ARZ3NDEKTSV4RRFFQ69G5FAV", -60_000);
+      await repo.put(expired);
+
+      const found = await repo.get(valid.site, valid.id);
+      assertEquals(found === null || found.isExpiredAt(), true);
       assertEquals(
-        recordOf(await repo.get(expired.site, expired.id)),
-        toStoredToken(expired),
+        (await repo.list()).every((token) => token.isExpiredAt()),
+        true,
       );
     }));
 }
