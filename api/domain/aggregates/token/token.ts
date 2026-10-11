@@ -1,5 +1,6 @@
 import type { TokenRecord } from "../../../../shared/mod.ts";
 import { SiteName } from "./value-objects/site-name.ts";
+import { ValidationError } from "../../shared/validation.error.ts";
 import { TokenId } from "./value-objects/token-id.ts";
 
 /** 表示名が未指定・空のときに使う既定の表示名 */
@@ -10,11 +11,11 @@ const normalizeName = (name?: string): string => name?.trim() || DEFAULT_NAME;
 
 /**
  * 失効日時が未来であることを確かめる
- * @throws {RangeError} 失効日時が現在以前の場合
+ * @throws {ValidationError} 失効日時が現在以前の場合
  */
 const assertFutureExpiry = (expiresAt: Date, now: Date): void => {
   if (expiresAt.getTime() <= now.getTime()) {
-    throw new RangeError("失効日時は未来の日時を指定してください");
+    throw new ValidationError("失効日時は未来の日時を指定してください");
   }
 };
 
@@ -44,7 +45,7 @@ export class Token {
    * 新しいトークンを作成する（IDは新しく発行する）
    * @param input サイト名・表示名・失効日時
    * @param now 発行日時
-   * @throws {RangeError} 失効日時が現在以前の場合
+   * @throws {ValidationError} 失効日時が現在以前の場合
    */
   static create(
     input: { site: SiteName; name?: string; expiresAt: Date },
@@ -63,7 +64,7 @@ export class Token {
   /**
    * 永続化された値からトークンを復元する（失効済みでも復元する）
    * @param record 永続化された値
-   * @throws {RangeError} サイト名・IDが不正な場合
+   * @throws {ValidationError} サイト名・IDが不正な場合
    */
   static restore(record: TokenRecord): Token {
     return new Token(
@@ -99,7 +100,7 @@ export class Token {
    * 失効日時を変更する
    * @param expiresAt 新しい失効日時
    * @param now 判定基準の日時
-   * @throws {RangeError} 失効日時が現在以前の場合
+   * @throws {ValidationError} 失効日時が現在以前の場合
    */
   changeExpiry(expiresAt: Date, now = new Date()): void {
     assertFutureExpiry(expiresAt, now);

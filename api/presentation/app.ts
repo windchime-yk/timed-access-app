@@ -9,6 +9,7 @@ import {
 } from "../../shared/mod.ts";
 import { requireApiKey } from "./middleware/api-key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
+import { ValidationError } from "../application/errors.ts";
 import type { TokenService } from "../application/token.service.ts";
 import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 
@@ -158,7 +159,7 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
     if (err instanceof HTTPException) {
       return ctx.json({ status: err.status, message: err.message }, err.status);
     }
-    if (err instanceof RangeError) {
+    if (err instanceof ValidationError) {
       return ctx.json(
         { status: STATUS_CODE.BadRequest, message: err.message },
         STATUS_CODE.BadRequest,

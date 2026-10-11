@@ -16,7 +16,7 @@ export class TokenService {
    * ULIDを生成し、指定したサイト配下に失効日時付きで保存する
    * @param input サイト名・表示名・失効日時
    * @returns 発行されたトークン
-   * @throws {RangeError} サイト名が不正、または失効日時が現在以前の場合
+   * @throws {ValidationError} サイト名が不正、または失効日時が現在以前の場合
    */
   async create(
     input: { site: string; name?: string; expiresAt: Date },
@@ -36,7 +36,7 @@ export class TokenService {
    * 有効なトークンをサイト名・作成順（ULID順）で列挙する
    * @param site 指定した場合はそのサイトのトークンのみ列挙
    * @returns 有効なトークンの一覧
-   * @throws {RangeError} サイト名が不正な場合
+   * @throws {ValidationError} サイト名が不正な場合
    */
   async list(site?: string): Promise<Token[]> {
     const siteName = site === undefined ? undefined : SiteName.from(site);
@@ -67,7 +67,7 @@ export class TokenService {
    * @param id トークンのULID
    * @param patch 更新内容（未指定の項目は維持）
    * @returns 更新後のトークン。存在しないか失効済みなら null
-   * @throws {RangeError} 失効日時が現在以前の場合
+   * @throws {ValidationError} 失効日時が現在以前の場合
    */
   async update(
     site: string,

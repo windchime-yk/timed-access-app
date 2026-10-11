@@ -1,4 +1,5 @@
 import { SITE_NAME_PATTERN } from "../../../../../shared/mod.ts";
+import { ValidationError } from "../../../shared/validation.error.ts";
 import { ValueObject } from "../../../shared/value-object.ts";
 
 /** トークンが属するサイト名（英小文字・数字・ハイフン1〜64文字のスラッグ） */
@@ -10,12 +11,12 @@ export class SiteName extends ValueObject<string> {
   /**
    * 値を検証してサイト名を作る
    * @param value 入力値
-   * @throws {RangeError} スラッグとして不正な場合
+   * @throws {ValidationError} スラッグとして不正な場合
    */
   static from(value: unknown): SiteName {
     const siteName = SiteName.tryFrom(value);
     if (siteName === null) {
-      throw new RangeError(
+      throw new ValidationError(
         "サイト名は英小文字・数字・ハイフン1〜64文字で指定してください",
       );
     }
