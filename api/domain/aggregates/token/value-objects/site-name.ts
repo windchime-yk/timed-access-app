@@ -1,6 +1,8 @@
-import { SITE_NAME_PATTERN } from "../../../../../shared/mod.ts";
 import { ValidationError } from "../../../shared/validation.error.ts";
 import { ValueObject } from "../../../shared/value-object.ts";
+
+/** サイト名として使えるスラッグ（URLセグメントになるため英小文字・数字・ハイフンのみ） */
+const SITE_NAME_PATTERN = /^[a-z0-9-]{1,64}$/;
 
 /** トークンが属するサイト名（英小文字・数字・ハイフン1〜64文字のスラッグ） */
 export class SiteName extends ValueObject<string> {

@@ -4,9 +4,6 @@ export const API_KEY_HEADER = "x-api-key";
 /** APIキーを設定する環境変数名 */
 export const API_KEY_ENV = "TIMED_ACCESS_API_KEY";
 
-/** サイト名として使えるスラッグ（URLセグメントになるため英小文字・数字・ハイフンのみ） */
-export const SITE_NAME_PATTERN = /^[a-z0-9-]{1,64}$/;
-
 /** 発行済みトークンの情報 */
 export type TokenRecord = {
   /** トークン本体となるULID */
