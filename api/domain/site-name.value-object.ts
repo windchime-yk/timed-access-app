@@ -1,11 +1,10 @@
 import { SITE_NAME_PATTERN } from "../../shared/mod.ts";
+import { ValueObject } from "./value-object.ts";
 
 /** トークンが属するサイト名（英小文字・数字・ハイフン1〜64文字のスラッグ） */
-export class SiteName {
-  readonly value: string;
-
+export class SiteName extends ValueObject<string> {
   private constructor(value: string) {
-    this.value = value;
+    super(value);
   }
 
   /**
@@ -33,13 +32,5 @@ export class SiteName {
       return null;
     }
     return new SiteName(value);
-  }
-
-  equals(other: SiteName): boolean {
-    return this.value === other.value;
-  }
-
-  toString(): string {
-    return this.value;
   }
 }

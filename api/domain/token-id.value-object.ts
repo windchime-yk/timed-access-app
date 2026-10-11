@@ -1,13 +1,12 @@
 import { monotonicUlid } from "@std/ulid";
+import { ValueObject } from "./value-object.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** トークン本体となるULID */
-export class TokenId {
-  readonly value: string;
-
+export class TokenId extends ValueObject<string> {
   private constructor(value: string) {
-    this.value = value;
+    super(value);
   }
 
   /** 新しいULIDを発行する（同一ミリ秒内でも単調増加） */
@@ -36,13 +35,5 @@ export class TokenId {
   static tryFrom(value: unknown): TokenId | null {
     if (typeof value !== "string" || !ULID_PATTERN.test(value)) return null;
     return new TokenId(value);
-  }
-
-  equals(other: TokenId): boolean {
-    return this.value === other.value;
-  }
-
-  toString(): string {
-    return this.value;
   }
 }
