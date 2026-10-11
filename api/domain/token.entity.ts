@@ -1,7 +1,22 @@
 import type { TokenRecord } from "../../shared/mod.ts";
 import { SiteName } from "./site-name.value-object.ts";
 import { TokenId } from "./token-id.value-object.ts";
-import { assertFutureExpiry, normalizeName } from "./token.ts";
+
+/** 表示名が未指定・空のときに使う既定の表示名 */
+const DEFAULT_NAME = "無題のトークン";
+
+/** 表示名の前後の空白を除き、空なら既定名にする */
+const normalizeName = (name?: string): string => name?.trim() || DEFAULT_NAME;
+
+/**
+ * 失効日時が未来であることを確かめる
+ * @throws {RangeError} 失効日時が現在以前の場合
+ */
+const assertFutureExpiry = (expiresAt: Date, now: Date): void => {
+  if (expiresAt.getTime() <= now.getTime()) {
+    throw new RangeError("失効日時は未来の日時を指定してください");
+  }
+};
 
 /** 時限式トークン。IDで同一性を判定し、状態の変更はメソッド経由に限る */
 export class Token {
