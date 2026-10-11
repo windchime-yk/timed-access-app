@@ -1,6 +1,7 @@
 import type { TokenRecord } from "../../shared/mod.ts";
 import { SiteName } from "./site-name.value-object.ts";
 import { TokenId } from "./token-id.value-object.ts";
+import { assertFutureExpiry, normalizeName } from "./token.ts";
 
 /** 時限式トークン。IDで同一性を判定し、状態の変更はメソッド経由に限る */
 export class Token {
@@ -34,13 +35,11 @@ export class Token {
     input: { site: SiteName; name?: string; expiresAt: Date },
     now = new Date(),
   ): Token {
-    if (input.expiresAt.getTime() <= now.getTime()) {
-      throw new RangeError("失効日時は未来の日時を指定してください");
-    }
+    assertFutureExpiry(input.expiresAt, now);
     return new Token(
       TokenId.generate(),
       input.site,
-      input.name?.trim() || "無題のトークン",
+      normalizeName(input.name),
       new Date(now),
       new Date(input.expiresAt),
     );
@@ -78,7 +77,7 @@ export class Token {
    * @param name 新しい表示名
    */
   rename(name?: string): void {
-    this.#name = name?.trim() || "無題のトークン";
+    this.#name = normalizeName(name);
   }
 
   /**
@@ -88,9 +87,7 @@ export class Token {
    * @throws {RangeError} 失効日時が現在以前の場合
    */
   changeExpiry(expiresAt: Date, now = new Date()): void {
-    if (expiresAt.getTime() <= now.getTime()) {
-      throw new RangeError("失効日時は未来の日時を指定してください");
-    }
+    assertFutureExpiry(expiresAt, now);
     this.#expiresAt = new Date(expiresAt);
   }
 
