@@ -250,3 +250,62 @@ Deno.test("エラー: 保存データの破損など入力以外のエラーは5
   assertEquals(res.status, 500);
   await res.body?.cancel();
 });
+
+/** 400のレスポンスからメッセージを取り出す */
+const badRequestMessage = async (res: Response): Promise<string> => {
+  assertEquals(res.status, 400);
+  const body: { message: string } = await res.json();
+  return body.message;
+};
+
+Deno.test("入力のルール違反はドメインのメッセージで400を返す", () =>
+  withApp(async (app) => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const siteMessage =
+      "サイト名は英小文字・数字・ハイフン1〜64文字で指定してください";
+    const expiryMessage = "失効日時は未来の日時を指定してください";
+
+    // サイト名の形式（発行・一覧の絞り込み）
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens", {
+          method: "POST",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ site: "Blog!", expiresAt: future }),
+        }),
+      ),
+      siteMessage,
+    );
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens?site=Blog!", { headers: AUTH_HEADERS }),
+      ),
+      siteMessage,
+    );
+
+    // 過去の失効日時（発行・更新）
+    assertEquals(
+      await badRequestMessage(
+        await app.request("/tokens", {
+          method: "POST",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            site: SITE,
+            expiresAt: "2000-01-01T00:00:00Z",
+          }),
+        }),
+      ),
+      expiryMessage,
+    );
+    const token = await createToken(app, new Date(Date.now() + 60_000));
+    assertEquals(
+      await badRequestMessage(
+        await app.request(`/tokens/${SITE}/${token.id}`, {
+          method: "PATCH",
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expiresAt: "2000-01-01T00:00:00Z" }),
+        }),
+      ),
+      expiryMessage,
+    );
+  }));
