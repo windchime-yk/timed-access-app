@@ -63,6 +63,7 @@ export class Token {
   /**
    * 保存済みのトークンを復元する（失効済みでも復元する）
    * @param props ドメインの型で表したトークンの値
+   * @throws {ValidationError} 日時として不正な値を含む場合
    */
   static restore(props: {
     id: TokenId;
@@ -71,6 +72,11 @@ export class Token {
     createdAt: Date;
     expiresAt: Date;
   }): Token {
+    for (const date of [props.createdAt, props.expiresAt]) {
+      if (Number.isNaN(date.getTime())) {
+        throw new ValidationError("日時として不正な値は復元できません");
+      }
+    }
     return new Token(
       props.id,
       props.site,
