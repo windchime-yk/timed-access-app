@@ -9,6 +9,7 @@ import { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { ValidationError } from "./errors.ts";
+import type { TokenDto } from "./token.dto.ts";
 import { TokenService } from "./token.service.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -21,10 +22,6 @@ const withService = async (
   const repo = new InMemoryTokenRepository();
   await fn(new TokenService(repo), repo);
 };
-
-/** Entityを比較しやすい値に変換する（null はそのまま） */
-const recordOf = (token: Token | null): TokenRecord | null =>
-  token?.toRecord() ?? null;
 
 /** 失効済みトークンをリポジトリへ直接書き込む（自動削除を経由しない失効状態の再現） */
 const seedExpiredToken = async (
@@ -50,13 +47,13 @@ Deno.test("create: ULIDと失効日時を持つトークンをサイト配下に
       expiresAt,
     });
 
-    assertMatch(token.id.value, ULID_PATTERN);
-    assertEquals(token.site.value, SITE);
+    assertMatch(token.id, ULID_PATTERN);
+    assertEquals(token.site, SITE);
     assertEquals(token.name, "テスト");
-    assertEquals(token.expiresAt, expiresAt);
+    assertEquals(token.expiresAt, expiresAt.toISOString());
     assertEquals(
-      recordOf(await service.get(SITE, token.id.value)),
-      token.toRecord(),
+      await service.get(SITE, token.id),
+      token,
     );
   }));
 
@@ -107,9 +104,9 @@ Deno.test("list: 有効なトークンのみを作成順で返す", () =>
       expiresAt: new Date(Date.now() + 120_000),
     });
 
-    assertEquals((await service.list()).map(recordOf), [
-      first.toRecord(),
-      second.toRecord(),
+    assertEquals(await service.list(), [
+      first,
+      second,
     ]);
   }));
 
@@ -124,15 +121,15 @@ Deno.test("list: サイトを指定するとそのサイトのトークンのみ
       expiresAt: new Date(Date.now() + 60_000),
     });
 
-    assertEquals((await service.list("blog")).map(recordOf), [
-      blogToken.toRecord(),
+    assertEquals(await service.list("blog"), [
+      blogToken,
     ]);
-    assertEquals((await service.list("portfolio")).map(recordOf), [
-      portfolioToken.toRecord(),
+    assertEquals(await service.list("portfolio"), [
+      portfolioToken,
     ]);
-    assertEquals((await service.list()).map(recordOf), [
-      blogToken.toRecord(),
-      portfolioToken.toRecord(),
+    assertEquals(await service.list(), [
+      blogToken,
+      portfolioToken,
     ]);
     assertEquals(await service.list("unknown"), []);
   }));
@@ -154,7 +151,7 @@ Deno.test("get: サイトが異なるとnullを返す", () =>
       site: SITE,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    assertEquals(await service.get("other-site", token.id.value), null);
+    assertEquals(await service.get("other-site", token.id), null);
   }));
 
 Deno.test("get: サイト名・IDの形式が不正ならnullを返す", () =>
@@ -163,7 +160,7 @@ Deno.test("get: サイト名・IDの形式が不正ならnullを返す", () =>
       site: SITE,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    assertEquals(await service.get("Blog!", token.id.value), null);
+    assertEquals(await service.get("Blog!", token.id), null);
     assertEquals(await service.get(SITE, "unknown"), null);
   }));
 
@@ -176,16 +173,16 @@ Deno.test("update: 表示名と失効日時を更新し、失効済みには適�
     });
     const newExpiresAt = new Date(Date.now() + 120_000);
 
-    const updated = await service.update(SITE, token.id.value, {
+    const updated = await service.update(SITE, token.id, {
       name: "更新後",
       expiresAt: newExpiresAt,
     });
     assertEquals(updated?.name, "更新後");
-    assertEquals(updated?.expiresAt, newExpiresAt);
+    assertEquals(updated?.expiresAt, newExpiresAt.toISOString());
     assertNotEquals(updated?.expiresAt, token.expiresAt);
     assertEquals(
-      recordOf(await service.get(SITE, token.id.value)),
-      recordOf(updated),
+      await service.get(SITE, token.id),
+      updated,
     );
 
     const expired = await seedExpiredToken(repo);
@@ -204,17 +201,17 @@ Deno.test("update: nameの未指定は維持、空文字は既定名にリセッ
     });
 
     // name未指定 → 維持（失効日時だけ更新）
-    const kept = await service.update(SITE, token.id.value, {
+    const kept = await service.update(SITE, token.id, {
       expiresAt: new Date(Date.now() + 120_000),
     });
     assertEquals(kept?.name, "元の名前");
 
     // name="" → 既定名にリセット（createと同じ扱い）
-    const reset = await service.update(SITE, token.id.value, { name: "" });
+    const reset = await service.update(SITE, token.id, { name: "" });
     assertEquals(reset?.name, "無題のトークン");
 
     // 空白のみも既定名にリセット
-    const resetBlank = await service.update(SITE, token.id.value, {
+    const resetBlank = await service.update(SITE, token.id, {
       name: "   ",
     });
     assertEquals(resetBlank?.name, "無題のトークン");
@@ -228,7 +225,7 @@ Deno.test("update: 過去の失効日時には更新できない", () =>
     });
     await assertRejects(
       () =>
-        service.update(SITE, token.id.value, {
+        service.update(SITE, token.id, {
           expiresAt: new Date(Date.now() - 1_000),
         }),
       ValidationError,
@@ -242,9 +239,9 @@ Deno.test("delete: トークンを失効させ、二重削除はfalseを返す",
       expiresAt: new Date(Date.now() + 60_000),
     });
 
-    assertEquals(await service.delete(SITE, token.id.value), true);
-    assertEquals(await service.get(SITE, token.id.value), null);
-    assertEquals(await service.delete(SITE, token.id.value), false);
+    assertEquals(await service.delete(SITE, token.id), true);
+    assertEquals(await service.get(SITE, token.id), null);
+    assertEquals(await service.delete(SITE, token.id), false);
     assertEquals(await service.delete(SITE, "unknown"), false);
   }));
 
@@ -256,9 +253,9 @@ Deno.test("verify: 有効ならトークン付き、無効ならvalid: falseを�
     });
     const expired = await seedExpiredToken(repo);
 
-    assertEquals(await service.verify(SITE, token.id.value), {
+    assertEquals(await service.verify(SITE, token.id), {
       valid: true,
-      token: token.toRecord(),
+      token,
     });
     assertEquals(await service.verify(SITE, expired.id), { valid: false });
     assertEquals(await service.verify(SITE, "存在しないID"), { valid: false });
@@ -271,10 +268,25 @@ Deno.test("verify: サイトが異なるとvalid: falseを返す", () =>
       expiresAt: new Date(Date.now() + 60_000),
     });
 
-    assertEquals(await service.verify("other-site", token.id.value), {
+    assertEquals(await service.verify("other-site", token.id), {
       valid: false,
     });
-    assertEquals(await service.verify("Blog!", token.id.value), {
+    assertEquals(await service.verify("Blog!", token.id), {
       valid: false,
     });
+  }));
+
+Deno.test("返り値: Entityではなく、書き換えても保存済みの値に影響しないプレーンな値", () =>
+  withService(async (service) => {
+    const token: TokenDto = await service.create({
+      site: SITE,
+      name: "元の名前",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    assertEquals(Object.getPrototypeOf(token), Object.prototype);
+    assertEquals("rename" in token, false);
+
+    token.name = "書き換え";
+    assertEquals((await service.get(SITE, token.id))?.name, "元の名前");
   }));
