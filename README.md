@@ -22,13 +22,22 @@ Deno Workspaceで3つのパッケージを管理しています。
 
 `api/` は永続化先を差し替えられるよう、次の4層に分けています。
 
-| ディレクトリ          | 役割                                                                |
-| --------------------- | ------------------------------------------------------------------- |
-| `api/domain/`         | トークンのルール（失効判定・既定名など）と `TokenRepository` の定義 |
-| `api/application/`    | `TokenService`。ULIDの発行と作成・取得・更新・削除・検証の流れ      |
-| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ）           |
-| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                          |
-| `api/main.ts`         | 各層を組み立ててサーバーを起動する                                  |
+| ディレクトリ          | 役割                                                                            |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `api/domain/`         | Entity `Token`、値オブジェクト `SiteName` / `TokenId`、`TokenRepository` の定義 |
+| `api/application/`    | `TokenService`。発行・取得・更新・削除・検証の流れ                              |
+| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ）                       |
+| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                                      |
+| `api/main.ts`         | 各層を組み立ててサーバーを起動する                                              |
+
+- トークンのルール（失効日時は未来であること、表示名の既定値、失効の判定）は
+  Entity `Token` が持ち、状態の変更は `rename` / `changeExpiry`
+  などのメソッド経由に限ります
+- サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
+  ドメインに入ることはありません
+- APIの入出力（`TokenRecord`）との変換は、http層（レスポンス時の
+  `toRecord()`）と リポジトリの実装（保存時の `toRecord()`、読み込み時の
+  `Token.reconstruct()`）で行います
 
 新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に
 `TokenRepository` の実装を追加し、`infrastructure/token.repository.test.ts` の
