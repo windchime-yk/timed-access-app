@@ -6,7 +6,6 @@ import { STATUS_CODE } from "@std/http/status";
 import type { TokenCreateInput, TokenUpdateInput } from "../../shared/mod.ts";
 import { ValidationError } from "../application/errors.ts";
 import type { TokenService } from "../application/token.service.ts";
-import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import { requireApiKey } from "./middleware/api-key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
 
@@ -25,8 +24,8 @@ const parseJsonBody = async <T>(ctx: Context): Promise<T> => {
 };
 
 /**
- * 失効日時の入力値を検証してDateに変換する
- * @throws {HTTPException} 日時として不正、または過去の日時の場合は400
+ * 失効日時の入力値をDateに変換する（未来かどうかの判定はドメインに任せる）
+ * @throws {HTTPException} 日時の形式として解釈できない場合は400
  */
 const parseExpiresAt = (value: unknown): Date => {
   const date = typeof value === "string" ? new Date(value) : null;
@@ -35,26 +34,7 @@ const parseExpiresAt = (value: unknown): Date => {
       message: "expiresAt はISO 8601形式の日時で指定してください",
     });
   }
-  if (date.getTime() <= Date.now()) {
-    throw new HTTPException(STATUS_CODE.BadRequest, {
-      message: "expiresAt は未来の日時を指定してください",
-    });
-  }
   return date;
-};
-
-/**
- * サイト名の入力値を検証する
- * @throws {HTTPException} スラッグとして不正な場合は400
- */
-const parseSite = (value: unknown): string => {
-  const site = SiteName.tryFrom(value);
-  if (site === null) {
-    throw new HTTPException(STATUS_CODE.BadRequest, {
-      message: "site は英小文字・数字・ハイフン1〜64文字で指定してください",
-    });
-  }
-  return site.value;
 };
 
 const tokenNotFound = () =>
@@ -91,7 +71,7 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
   app.post("/tokens", async (ctx) => {
     const body = await parseJsonBody<TokenCreateInput>(ctx);
     const token = await service.create({
-      site: parseSite(body.site),
+      site: body.site,
       name: body.name,
       expiresAt: parseExpiresAt(body.expiresAt),
     });
@@ -99,10 +79,7 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
   });
 
   app.get("/tokens", async (ctx) => {
-    const site = ctx.req.query("site");
-    const tokens = await service.list(
-      site === undefined ? undefined : parseSite(site),
-    );
+    const tokens = await service.list(ctx.req.query("site"));
     return ctx.json({ tokens: tokens.map((token) => token.toRecord()) });
   });
 
