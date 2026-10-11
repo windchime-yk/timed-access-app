@@ -1,8 +1,12 @@
-import type { VerifyResult } from "../../shared/mod.ts";
 import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
 import { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
+import {
+  type TokenDto,
+  toTokenDto,
+  type VerificationDto,
+} from "./token.dto.ts";
 
 /** 時限式トークンの発行・管理・検証を行うアプリケーションサービス */
 export class TokenService {
@@ -20,7 +24,7 @@ export class TokenService {
    */
   async create(
     input: { site: string; name?: string; expiresAt: Date },
-  ): Promise<Token> {
+  ): Promise<TokenDto> {
     const token = Token.create({
       site: SiteName.from(input.site),
       name: input.name,
@@ -29,7 +33,7 @@ export class TokenService {
 
     await this.#repo.put(token);
 
-    return token;
+    return toTokenDto(token);
   }
 
   /**
@@ -38,11 +42,11 @@ export class TokenService {
    * @returns 有効なトークンの一覧
    * @throws {ValidationError} サイト名が不正な場合
    */
-  async list(site?: string): Promise<Token[]> {
+  async list(site?: string): Promise<TokenDto[]> {
     const siteName = site === undefined ? undefined : SiteName.from(site);
     const tokens = await this.#repo.list(siteName);
     // 永続化先の自動削除は失効直後に反映されない場合があるため日時でも判定
-    return tokens.filter((token) => !token.isExpiredAt());
+    return tokens.filter((token) => !token.isExpiredAt()).map(toTokenDto);
   }
 
   /**
@@ -51,14 +55,9 @@ export class TokenService {
    * @param id トークンのULID
    * @returns トークン。形式が不正・存在しない・失効済みなら null
    */
-  async get(site: string, id: string): Promise<Token | null> {
-    const siteName = SiteName.tryFrom(site);
-    const tokenId = TokenId.tryFrom(id);
-    if (siteName === null || tokenId === null) return null;
-
-    const token = await this.#repo.get(siteName, tokenId);
-    if (token === null || token.isExpiredAt()) return null;
-    return token;
+  async get(site: string, id: string): Promise<TokenDto | null> {
+    const token = await this.#find(site, id);
+    return token === null ? null : toTokenDto(token);
   }
 
   /**
@@ -73,8 +72,8 @@ export class TokenService {
     site: string,
     id: string,
     patch: { name?: string; expiresAt?: Date },
-  ): Promise<Token | null> {
-    const token = await this.get(site, id);
+  ): Promise<TokenDto | null> {
+    const token = await this.#find(site, id);
     if (token === null) return null;
 
     // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
@@ -82,7 +81,7 @@ export class TokenService {
     if (patch.expiresAt !== undefined) token.changeExpiry(patch.expiresAt);
     await this.#repo.put(token);
 
-    return token;
+    return toTokenDto(token);
   }
 
   /**
@@ -92,7 +91,7 @@ export class TokenService {
    * @returns 削除できたら true。存在しないか失効済みなら false
    */
   async delete(site: string, id: string): Promise<boolean> {
-    const token = await this.get(site, id);
+    const token = await this.#find(site, id);
     if (token === null) return false;
 
     await this.#repo.delete(token.site, token.id);
@@ -105,10 +104,22 @@ export class TokenService {
    * @param id トークンのULID
    * @returns 検証結果。有効ならトークン情報も返す
    */
-  async verify(site: string, id: string): Promise<VerifyResult> {
+  async verify(site: string, id: string): Promise<VerificationDto> {
     const token = await this.get(site, id);
-    return token === null
-      ? { valid: false }
-      : { valid: true, token: token.toRecord() };
+    return token === null ? { valid: false } : { valid: true, token };
+  }
+
+  /**
+   * 有効なトークンのEntityを探す
+   * @returns Entity。形式が不正・存在しない・失効済みなら null
+   */
+  async #find(site: string, id: string): Promise<Token | null> {
+    const siteName = SiteName.tryFrom(site);
+    const tokenId = TokenId.tryFrom(id);
+    if (siteName === null || tokenId === null) return null;
+
+    const token = await this.#repo.get(siteName, tokenId);
+    if (token === null || token.isExpiredAt()) return null;
+    return token;
   }
 }

@@ -75,18 +75,18 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
       name: body.name,
       expiresAt: parseExpiresAt(body.expiresAt),
     });
-    return ctx.json(token.toRecord(), STATUS_CODE.Created);
+    return ctx.json(token, STATUS_CODE.Created);
   });
 
   app.get("/tokens", async (ctx) => {
     const tokens = await service.list(ctx.req.query("site"));
-    return ctx.json({ tokens: tokens.map((token) => token.toRecord()) });
+    return ctx.json({ tokens });
   });
 
   app.get("/tokens/:site/:id", async (ctx) => {
     const token = await service.get(ctx.req.param("site"), ctx.req.param("id"));
     if (token === null) throw tokenNotFound();
-    return ctx.json(token.toRecord());
+    return ctx.json(token);
   });
 
   app.patch("/tokens/:site/:id", async (ctx) => {
@@ -102,7 +102,7 @@ export const createApp = (service: TokenService, options: AppOptions = {}) => {
       },
     );
     if (token === null) throw tokenNotFound();
-    return ctx.json(token.toRecord());
+    return ctx.json(token);
   });
 
   app.delete("/tokens/:site/:id", async (ctx) => {
