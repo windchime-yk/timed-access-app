@@ -1,11 +1,7 @@
-import { monotonicUlid } from "@std/ulid";
 import type { VerifyResult } from "../../shared/mod.ts";
-import {
-  assertFutureExpiry,
-  isExpired,
-  normalizeName,
-  type Token,
-} from "../domain/token.ts";
+import { SiteName } from "../domain/site-name.value-object.ts";
+import { TokenId } from "../domain/token-id.value-object.ts";
+import { Token } from "../domain/token.entity.ts";
 import type { TokenRepository } from "../domain/token.repository.ts";
 
 /** 時限式トークンの発行・管理・検証を行うアプリケーションサービス */
@@ -20,23 +16,18 @@ export class TokenService {
    * ULIDを生成し、指定したサイト配下に失効日時付きで保存する
    * @param input サイト名・表示名・失効日時
    * @returns 発行されたトークン
-   * @throws {RangeError} 失効日時が現在以前の場合
+   * @throws {RangeError} サイト名が不正、または失効日時が現在以前の場合
    */
   async create(
     input: { site: string; name?: string; expiresAt: Date },
   ): Promise<Token> {
-    const now = new Date();
-    assertFutureExpiry(input.expiresAt, now);
+    const token = Token.issue({
+      site: SiteName.from(input.site),
+      name: input.name,
+      expiresAt: input.expiresAt,
+    });
 
-    const token: Token = {
-      id: monotonicUlid(),
-      site: input.site,
-      name: normalizeName(input.name),
-      createdAt: now.toISOString(),
-      expiresAt: input.expiresAt.toISOString(),
-    };
-
-    await this.#repo.put(token);
+    await this.#repo.put(token.toRecord());
 
     return token;
   }
@@ -45,23 +36,33 @@ export class TokenService {
    * 有効なトークンをサイト名・作成順（ULID順）で列挙する
    * @param site 指定した場合はそのサイトのトークンのみ列挙
    * @returns 有効なトークンの一覧
+   * @throws {RangeError} サイト名が不正な場合
    */
   async list(site?: string): Promise<Token[]> {
-    const tokens = await this.#repo.list(site);
+    const siteName = site === undefined ? undefined : SiteName.from(site);
+    const records = await this.#repo.list(siteName?.value);
     // 永続化先の自動削除は失効直後に反映されない場合があるため日時でも判定
-    return tokens.filter((token) => !isExpired(token));
+    return records
+      .map((record) => Token.reconstruct(record))
+      .filter((token) => !token.isExpiredAt());
   }
 
   /**
    * トークンを取得する
    * @param site トークンが属するサイト名
    * @param id トークンのULID
-   * @returns トークン。存在しないか失効済みなら null
+   * @returns トークン。形式が不正・存在しない・失効済みなら null
    */
   async get(site: string, id: string): Promise<Token | null> {
-    const token = await this.#repo.get(site, id);
-    if (token === null || isExpired(token)) return null;
-    return token;
+    const siteName = SiteName.tryFrom(site);
+    const tokenId = TokenId.tryFrom(id);
+    if (siteName === null || tokenId === null) return null;
+
+    const record = await this.#repo.get(siteName.value, tokenId.value);
+    if (record === null) return null;
+
+    const token = Token.reconstruct(record);
+    return token.isExpiredAt() ? null : token;
   }
 
   /**
@@ -77,21 +78,15 @@ export class TokenService {
     id: string,
     patch: { name?: string; expiresAt?: Date },
   ): Promise<Token | null> {
-    const current = await this.get(site, id);
-    if (current === null) return null;
+    const token = await this.get(site, id);
+    if (token === null) return null;
 
-    const expiresAt = patch.expiresAt ?? new Date(current.expiresAt);
-    assertFutureExpiry(expiresAt);
+    // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
+    if (patch.name !== undefined) token.rename(patch.name);
+    if (patch.expiresAt !== undefined) token.changeExpiry(patch.expiresAt);
+    await this.#repo.put(token.toRecord());
 
-    const updated: Token = {
-      ...current,
-      // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
-      name: patch.name === undefined ? current.name : normalizeName(patch.name),
-      expiresAt: expiresAt.toISOString(),
-    };
-    await this.#repo.put(updated);
-
-    return updated;
+    return token;
   }
 
   /**
@@ -101,10 +96,10 @@ export class TokenService {
    * @returns 削除できたら true。存在しないか失効済みなら false
    */
   async delete(site: string, id: string): Promise<boolean> {
-    const current = await this.get(site, id);
-    if (current === null) return false;
+    const token = await this.get(site, id);
+    if (token === null) return false;
 
-    await this.#repo.delete(site, id);
+    await this.#repo.delete(token.site.value, token.id.value);
     return true;
   }
 
@@ -116,6 +111,8 @@ export class TokenService {
    */
   async verify(site: string, id: string): Promise<VerifyResult> {
     const token = await this.get(site, id);
-    return token === null ? { valid: false } : { valid: true, token };
+    return token === null
+      ? { valid: false }
+      : { valid: true, token: token.toRecord() };
   }
 }
