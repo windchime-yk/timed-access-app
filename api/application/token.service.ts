@@ -1,25 +1,16 @@
 import { monotonicUlid } from "@std/ulid";
-import type { TokenRecord, VerifyResult } from "../shared/mod.ts";
-
-const KEY_PREFIX = "tokens";
+import type { VerifyResult } from "../../shared/mod.ts";
+import { isExpired, type Token } from "../domain/token.ts";
+import type { TokenRepository } from "../domain/token.repository.ts";
 
 const DEFAULT_NAME = "無題のトークン";
 
-/**
- * トークンが失効日時を過ぎているか判定する
- * @param token 判定対象のトークン
- * @param now 判定基準の日時
- * @returns 失効していれば true
- */
-export const isExpired = (token: TokenRecord, now = new Date()): boolean =>
-  new Date(token.expiresAt).getTime() <= now.getTime();
-
 /** Deno KVを用いた時限式トークンの永続化層 */
-export class TokenStore {
-  #kv: Deno.Kv;
+export class TokenService {
+  #repo: TokenRepository;
 
-  constructor(kv: Deno.Kv) {
-    this.#kv = kv;
+  constructor(repo: TokenRepository) {
+    this.#repo = repo;
   }
 
   /**
@@ -30,14 +21,14 @@ export class TokenStore {
    */
   async create(
     input: { site: string; name?: string; expiresAt: Date },
-  ): Promise<TokenRecord> {
+  ): Promise<Token> {
     const now = new Date();
     const expireIn = input.expiresAt.getTime() - now.getTime();
     if (expireIn <= 0) {
       throw new RangeError("失効日時は未来の日時を指定してください");
     }
 
-    const token: TokenRecord = {
+    const token: Token = {
       id: monotonicUlid(),
       site: input.site,
       name: input.name?.trim() || DEFAULT_NAME,
@@ -45,10 +36,7 @@ export class TokenStore {
       expiresAt: input.expiresAt.toISOString(),
     };
 
-    // 失効日時ちょうどにKVからも自動削除されるよう expireIn を設定
-    await this.#kv.set([KEY_PREFIX, token.site, token.id], token, {
-      expireIn,
-    });
+    await this.#repo.put(token);
 
     return token;
   }
@@ -58,14 +46,10 @@ export class TokenStore {
    * @param site 指定した場合はそのサイトのトークンのみ列挙
    * @returns 有効なトークンの一覧
    */
-  async list(site?: string): Promise<TokenRecord[]> {
-    const tokens: TokenRecord[] = [];
-    const prefix = site === undefined ? [KEY_PREFIX] : [KEY_PREFIX, site];
-    for await (const entry of this.#kv.list<TokenRecord>({ prefix })) {
-      // KVの自動削除は失効直後に反映されない場合があるため日時でも判定
-      if (!isExpired(entry.value)) tokens.push(entry.value);
-    }
-    return tokens;
+  async list(site?: string): Promise<Token[]> {
+    const tokens = await this.#repo.list(site);
+    // 永続化先の自動削除は失効直後に反映されない場合があるため日時でも判定
+    return tokens.filter((token) => !isExpired(token));
   }
 
   /**
@@ -74,10 +58,10 @@ export class TokenStore {
    * @param id トークンのULID
    * @returns トークン。存在しないか失効済みなら null
    */
-  async get(site: string, id: string): Promise<TokenRecord | null> {
-    const entry = await this.#kv.get<TokenRecord>([KEY_PREFIX, site, id]);
-    if (entry.value === null || isExpired(entry.value)) return null;
-    return entry.value;
+  async get(site: string, id: string): Promise<Token | null> {
+    const token = await this.#repo.get(site, id);
+    if (token === null || isExpired(token)) return null;
+    return token;
   }
 
   /**
@@ -92,7 +76,7 @@ export class TokenStore {
     site: string,
     id: string,
     patch: { name?: string; expiresAt?: Date },
-  ): Promise<TokenRecord | null> {
+  ): Promise<Token | null> {
     const current = await this.get(site, id);
     if (current === null) return null;
 
@@ -102,7 +86,7 @@ export class TokenStore {
       throw new RangeError("失効日時は未来の日時を指定してください");
     }
 
-    const updated: TokenRecord = {
+    const updated: Token = {
       ...current,
       // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
       name: patch.name === undefined
@@ -110,7 +94,7 @@ export class TokenStore {
         : patch.name.trim() || DEFAULT_NAME,
       expiresAt: expiresAt.toISOString(),
     };
-    await this.#kv.set([KEY_PREFIX, site, id], updated, { expireIn });
+    await this.#repo.put(updated);
 
     return updated;
   }
@@ -125,7 +109,7 @@ export class TokenStore {
     const current = await this.get(site, id);
     if (current === null) return false;
 
-    await this.#kv.delete([KEY_PREFIX, site, id]);
+    await this.#repo.delete(site, id);
     return true;
   }
 

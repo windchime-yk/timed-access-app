@@ -7,10 +7,10 @@ import {
   SITE_NAME_PATTERN,
   type TokenCreateInput,
   type TokenUpdateInput,
-} from "../shared/mod.ts";
-import { requireApiKey } from "./middleware/api_key.ts";
-import { rateLimit, type RateLimitOptions } from "./middleware/rate_limit.ts";
-import type { TokenStore } from "./store.ts";
+} from "../../shared/mod.ts";
+import { requireApiKey } from "./middleware/api-key.ts";
+import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
+import type { TokenService } from "../application/token.service.ts";
 
 /**
  * リクエストボディをJSONとして解釈する
@@ -73,7 +73,7 @@ export type AppOptions = {
   verifyRateLimit?: RateLimitOptions;
 };
 
-export const createApp = (store: TokenStore, options: AppOptions = {}) => {
+export const createApp = (store: TokenService, options: AppOptions = {}) => {
   const app = new Hono();
 
   // トークンの管理操作はAPIキー必須

@@ -1,0 +1,37 @@
+import type { Token } from "./token.ts";
+
+/**
+ * トークンの永続化インターフェース
+ *
+ * 失効済みのトークンを返す場合があるため、失効の判定は呼び出し側で行う。
+ * TTLなどの自動削除は `token.expiresAt` をもとに各実装が設定する。
+ */
+export interface TokenRepository {
+  /**
+   * トークンを保存する（同じ site/id があれば上書き）
+   * @param token 保存するトークン
+   */
+  put(token: Token): Promise<void>;
+
+  /**
+   * トークンを取得する
+   * @param site トークンが属するサイト名
+   * @param id トークンのULID
+   * @returns トークン。存在しなければ null
+   */
+  get(site: string, id: string): Promise<Token | null>;
+
+  /**
+   * トークンをサイト名→ID（ULID）の昇順で列挙する
+   * @param site 指定した場合は完全一致するサイトのトークンのみ
+   * @returns トークンの一覧
+   */
+  list(site?: string): Promise<Token[]>;
+
+  /**
+   * トークンを削除する（存在しなければ何もしない）
+   * @param site トークンが属するサイト名
+   * @param id トークンのULID
+   */
+  delete(site: string, id: string): Promise<void>;
+}
