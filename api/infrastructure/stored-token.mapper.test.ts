@@ -1,5 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { ValidationError } from "../domain/shared/validation.error.ts";
+import { CorruptedStoredTokenError } from "./corrupted-stored-token.error.ts";
 import { Token } from "../domain/aggregates/token/token.ts";
 import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
@@ -37,13 +38,29 @@ Deno.test("fromStoredToken: 保存形式からEntityを復元し、元の形に�
   assertEquals(toStoredToken(token), STORED);
 });
 
-Deno.test("fromStoredToken: 不正なサイト名・IDはValidationError", () => {
+Deno.test("fromStoredToken: 壊れた保存データはCorruptedStoredTokenErrorで、入力のエラーとは区別する", () => {
+  const broken: Partial<Record<keyof StoredToken, string>>[] = [
+    { site: "Blog!" },
+    { id: "unknown" },
+    { createdAt: "not a date" },
+    { expiresAt: "not a date" },
+  ];
+  for (const patch of broken) {
+    const error = assertThrows(
+      () => fromStoredToken({ ...STORED, ...patch }),
+      CorruptedStoredTokenError,
+      undefined,
+      JSON.stringify(patch),
+    );
+    assertEquals(error instanceof ValidationError, false);
+    assertEquals(error.cause instanceof ValidationError, true);
+  }
+});
+
+Deno.test("fromStoredToken: 保存データにフィールドが欠けていてもCorruptedStoredTokenError", () => {
+  const { site: _site, ...withoutSite } = STORED;
   assertThrows(
-    () => fromStoredToken({ ...STORED, site: "Blog!" }),
-    ValidationError,
-  );
-  assertThrows(
-    () => fromStoredToken({ ...STORED, id: "unknown" }),
-    ValidationError,
+    () => fromStoredToken(withoutSite as StoredToken),
+    CorruptedStoredTokenError,
   );
 });
