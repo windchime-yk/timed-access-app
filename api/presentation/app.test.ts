@@ -6,6 +6,7 @@ import {
   type VerifyResult,
 } from "../../shared/mod.ts";
 import { TokenService } from "../application/token.service.ts";
+import { CorruptedStoredTokenError } from "../infrastructure/corrupted-stored-token.error.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { createApp } from "./app.ts";
 
@@ -240,7 +241,9 @@ Deno.test("エラー: 保存データの破損など入力以外のエラーは5
   /** 一覧の取得で、壊れた保存データを復元したときの例外を再現する */
   class BrokenRepository extends InMemoryTokenRepository {
     override list(): Promise<never> {
-      return Promise.reject(new RangeError("保存データが壊れています"));
+      return Promise.reject(
+        new CorruptedStoredTokenError("保存データが壊れています"),
+      );
     }
   }
   Deno.env.set(API_KEY_ENV, API_KEY);
