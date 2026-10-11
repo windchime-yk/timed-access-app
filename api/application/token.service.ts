@@ -1,11 +1,14 @@
 import { monotonicUlid } from "@std/ulid";
 import type { VerifyResult } from "../../shared/mod.ts";
-import { isExpired, type Token } from "../domain/token.ts";
+import {
+  assertFutureExpiry,
+  isExpired,
+  normalizeName,
+  type Token,
+} from "../domain/token.ts";
 import type { TokenRepository } from "../domain/token.repository.ts";
 
-const DEFAULT_NAME = "無題のトークン";
-
-/** Deno KVを用いた時限式トークンの永続化層 */
+/** 時限式トークンの発行・管理・検証を行うアプリケーションサービス */
 export class TokenService {
   #repo: TokenRepository;
 
@@ -23,15 +26,12 @@ export class TokenService {
     input: { site: string; name?: string; expiresAt: Date },
   ): Promise<Token> {
     const now = new Date();
-    const expireIn = input.expiresAt.getTime() - now.getTime();
-    if (expireIn <= 0) {
-      throw new RangeError("失効日時は未来の日時を指定してください");
-    }
+    assertFutureExpiry(input.expiresAt, now);
 
     const token: Token = {
       id: monotonicUlid(),
       site: input.site,
-      name: input.name?.trim() || DEFAULT_NAME,
+      name: normalizeName(input.name),
       createdAt: now.toISOString(),
       expiresAt: input.expiresAt.toISOString(),
     };
@@ -81,17 +81,12 @@ export class TokenService {
     if (current === null) return null;
 
     const expiresAt = patch.expiresAt ?? new Date(current.expiresAt);
-    const expireIn = expiresAt.getTime() - Date.now();
-    if (expireIn <= 0) {
-      throw new RangeError("失効日時は未来の日時を指定してください");
-    }
+    assertFutureExpiry(expiresAt);
 
     const updated: Token = {
       ...current,
       // name未指定なら維持、指定ありで空なら既定名にリセット（createと同じ扱い）
-      name: patch.name === undefined
-        ? current.name
-        : patch.name.trim() || DEFAULT_NAME,
+      name: patch.name === undefined ? current.name : normalizeName(patch.name),
       expiresAt: expiresAt.toISOString(),
     };
     await this.#repo.put(updated);

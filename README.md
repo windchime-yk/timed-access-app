@@ -8,14 +8,31 @@ Deno Workspaceで3つのパッケージを管理しています。
 
 | ディレクトリ | 役割                                                                |
 | ------------ | ------------------------------------------------------------------- |
-| `api/`       | トークンの発行・検証API（Hono + Deno KV + `@std/ulid`）             |
+| `api/`       | トークンの発行・検証API（Hono + `@std/ulid`、永続化は Deno KV）     |
 | `desktop/`   | CRUD用デスクトップアプリ（Hono + hono/jsx、`deno desktop`でビルド） |
 | `shared/`    | 型と定数の共有パッケージ                                            |
 
-- ULIDは `@std/ulid` で生成し、Deno KVの `expireIn`
+- ULIDは `@std/ulid` で生成し、失効日時を過ぎたトークンは無効として扱われます。
+  現在の永続化先は Deno KV で、`expireIn`
   により失効日時ちょうどにレコードが自動削除されます
 - トークンはサイト名（英小文字・数字・ハイフンのスラッグ）ごとに保存・検証されます
 - 依存関係はすべてJSRから取得しています
+
+### APIの層構成
+
+`api/` は永続化先を差し替えられるよう、次の4層に分けています。
+
+| ディレクトリ          | 役割                                                                |
+| --------------------- | ------------------------------------------------------------------- |
+| `api/domain/`         | トークンのルール（失効判定・既定名など）と `TokenRepository` の定義 |
+| `api/application/`    | `TokenService`。ULIDの発行と作成・取得・更新・削除・検証の流れ      |
+| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ）           |
+| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                          |
+| `api/main.ts`         | 各層を組み立ててサーバーを起動する                                  |
+
+新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に
+`TokenRepository` の実装を追加し、`infrastructure/token.repository.test.ts` の
+契約テスト対象に加えたうえで `main.ts` で差し替えます。
 
 ## セットアップ
 

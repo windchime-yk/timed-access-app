@@ -4,13 +4,13 @@ import { cors } from "@hono/hono/cors";
 import { HTTPException } from "@hono/hono/http-exception";
 import { STATUS_CODE } from "@std/http/status";
 import {
-  SITE_NAME_PATTERN,
   type TokenCreateInput,
   type TokenUpdateInput,
 } from "../../shared/mod.ts";
 import { requireApiKey } from "./middleware/api-key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
 import type { TokenService } from "../application/token.service.ts";
+import { isValidSiteName } from "../domain/token.ts";
 
 /**
  * リクエストボディをJSONとして解釈する
@@ -50,7 +50,7 @@ const parseExpiresAt = (value: unknown): Date => {
  * @throws {HTTPException} スラッグとして不正な場合は400
  */
 const parseSite = (value: unknown): string => {
-  if (typeof value !== "string" || !SITE_NAME_PATTERN.test(value)) {
+  if (!isValidSiteName(value)) {
     throw new HTTPException(STATUS_CODE.BadRequest, {
       message: "site は英小文字・数字・ハイフン1〜64文字で指定してください",
     });
@@ -63,17 +63,18 @@ const tokenNotFound = () =>
     message: "指定されたトークンは存在しないか、既に失効しています",
   });
 
-/**
- * トークン発行・検証APIを構築する
- * @param store トークンの永続化層
- * @returns Honoアプリケーション
- */
 export type AppOptions = {
   /** 公開エンドポイント /verify のレート制限（既定: 60回/分/IP） */
   verifyRateLimit?: RateLimitOptions;
 };
 
-export const createApp = (store: TokenService, options: AppOptions = {}) => {
+/**
+ * トークン発行・検証APIを構築する
+ * @param service トークンのアプリケーションサービス
+ * @param options レート制限などの設定
+ * @returns Honoアプリケーション
+ */
+export const createApp = (service: TokenService, options: AppOptions = {}) => {
   const app = new Hono();
 
   // トークンの管理操作はAPIキー必須
@@ -90,7 +91,7 @@ export const createApp = (store: TokenService, options: AppOptions = {}) => {
 
   app.post("/tokens", async (ctx) => {
     const body = await parseJsonBody<TokenCreateInput>(ctx);
-    const token = await store.create({
+    const token = await service.create({
       site: parseSite(body.site),
       name: body.name,
       expiresAt: parseExpiresAt(body.expiresAt),
@@ -101,21 +102,21 @@ export const createApp = (store: TokenService, options: AppOptions = {}) => {
   app.get("/tokens", async (ctx) => {
     const site = ctx.req.query("site");
     return ctx.json({
-      tokens: await store.list(
+      tokens: await service.list(
         site === undefined ? undefined : parseSite(site),
       ),
     });
   });
 
   app.get("/tokens/:site/:id", async (ctx) => {
-    const token = await store.get(ctx.req.param("site"), ctx.req.param("id"));
+    const token = await service.get(ctx.req.param("site"), ctx.req.param("id"));
     if (token === null) throw tokenNotFound();
     return ctx.json(token);
   });
 
   app.patch("/tokens/:site/:id", async (ctx) => {
     const body = await parseJsonBody<TokenUpdateInput>(ctx);
-    const token = await store.update(
+    const token = await service.update(
       ctx.req.param("site"),
       ctx.req.param("id"),
       {
@@ -130,7 +131,7 @@ export const createApp = (store: TokenService, options: AppOptions = {}) => {
   });
 
   app.delete("/tokens/:site/:id", async (ctx) => {
-    const deleted = await store.delete(
+    const deleted = await service.delete(
       ctx.req.param("site"),
       ctx.req.param("id"),
     );
@@ -142,7 +143,7 @@ export const createApp = (store: TokenService, options: AppOptions = {}) => {
     // 有効性の判定結果が中間キャッシュに残らないようにする
     ctx.header("cache-control", "no-store");
     return ctx.json(
-      await store.verify(ctx.req.param("site"), ctx.req.param("id")),
+      await service.verify(ctx.req.param("site"), ctx.req.param("id")),
     );
   });
 
