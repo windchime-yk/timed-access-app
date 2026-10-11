@@ -49,6 +49,7 @@ api/domain/
         token-id.ts
   shared/
     value-object.ts         # 値オブジェクトの基底クラス
+    validation.error.ts     # ドメインのルール違反を表すエラー
 ```
 
 - トークンのルール（失効日時は未来であること、表示名の既定値、失効の判定）は
@@ -58,12 +59,16 @@ api/domain/
   へ移して共有します
 - サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
   ドメインに入ることはありません
-- Entityは application層の外へ出しません。`TokenService`
-  は、Entityの操作を持たない プレーンな値 `TokenDto` を返します
-  - presentation層は、`TokenDto` がAPIの契約（`TokenRecord` /
-    `VerifyResult`）と一致することを型で確かめてから返します
-  - リポジトリの実装は、保存時に `toRecord()`、読み込み時に `Token.restore()`
-    で変換します
+- ルール違反は `ValidationError` で表し、presentation層はこれだけを400にします
+
+層の間では、次の値で受け渡します。Entityはdomain・application・infrastructureの
+中だけで扱い、APIの契約（`shared/mod.ts`）に依存するのはpresentation層だけです。
+
+| 境界                        | 受け渡す値                                       | 変換する場所                                           |
+| --------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| presentation ↔ application  | `TokenDto`（Entityの操作を持たないプレーンな値） | `application/token.dto.ts` の `toTokenDto`             |
+| presentation → クライアント | `TokenRecord` / `VerifyResult`（APIの契約）      | 変換なし。`satisfies` で `TokenDto` との一致を確かめる |
+| infrastructure ↔ 永続化先   | `StoredToken`（保存形式）                        | `infrastructure/stored-token.mapper.ts`                |
 
 新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に
 `TokenRepository` の実装を追加し、`infrastructure/token.repository.test.ts` の
