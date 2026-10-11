@@ -13,6 +13,9 @@ import type { Token } from "./token.ts";
 export interface TokenRepository {
   /**
    * トークンを保存する（同じ site/id があれば上書き）
+   *
+   * 既に失効しているトークンを渡されても失敗しない。ただし期限のないレコードとして
+   * 残してはならない（保存しない・削除するなど、実装に応じて扱う）。
    * @param token 保存するトークン
    */
   put(token: Token): Promise<void>;
