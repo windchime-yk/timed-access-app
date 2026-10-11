@@ -10,7 +10,7 @@ import {
 import { requireApiKey } from "./middleware/api-key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
 import type { TokenService } from "../application/token.service.ts";
-import { isValidSiteName } from "../domain/token.ts";
+import { SiteName } from "../domain/site-name.value-object.ts";
 
 /**
  * リクエストボディをJSONとして解釈する
@@ -50,12 +50,13 @@ const parseExpiresAt = (value: unknown): Date => {
  * @throws {HTTPException} スラッグとして不正な場合は400
  */
 const parseSite = (value: unknown): string => {
-  if (!isValidSiteName(value)) {
+  const site = SiteName.tryFrom(value);
+  if (site === null) {
     throw new HTTPException(STATUS_CODE.BadRequest, {
       message: "site は英小文字・数字・ハイフン1〜64文字で指定してください",
     });
   }
-  return value;
+  return site.value;
 };
 
 const tokenNotFound = () =>

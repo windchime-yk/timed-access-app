@@ -1,4 +1,4 @@
-import { SITE_NAME_PATTERN, type TokenRecord } from "../../shared/mod.ts";
+import type { TokenRecord } from "../../shared/mod.ts";
 
 /** 時限式トークン（APIの入出力と同じ形をそのまま使う） */
 export type Token = TokenRecord;
@@ -34,11 +34,3 @@ export const assertFutureExpiry = (expiresAt: Date, now = new Date()): void => {
     throw new RangeError("失効日時は未来の日時を指定してください");
   }
 };
-
-/**
- * サイト名として使えるスラッグか判定する
- * @param value 判定対象
- * @returns 英小文字・数字・ハイフン1〜64文字なら true
- */
-export const isValidSiteName = (value: unknown): value is string =>
-  typeof value === "string" && SITE_NAME_PATTERN.test(value);
