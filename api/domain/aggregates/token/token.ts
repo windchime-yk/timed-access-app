@@ -1,6 +1,5 @@
-import type { TokenRecord } from "../../../../shared/mod.ts";
-import { SiteName } from "./value-objects/site-name.ts";
 import { ValidationError } from "../../shared/validation.error.ts";
+import type { SiteName } from "./value-objects/site-name.ts";
 import { TokenId } from "./value-objects/token-id.ts";
 
 /** 表示名が未指定・空のときに使う既定の表示名 */
@@ -62,17 +61,22 @@ export class Token {
   }
 
   /**
-   * 永続化された値からトークンを復元する（失効済みでも復元する）
-   * @param record 永続化された値
-   * @throws {ValidationError} サイト名・IDが不正な場合
+   * 保存済みのトークンを復元する（失効済みでも復元する）
+   * @param props ドメインの型で表したトークンの値
    */
-  static restore(record: TokenRecord): Token {
+  static restore(props: {
+    id: TokenId;
+    site: SiteName;
+    name: string;
+    createdAt: Date;
+    expiresAt: Date;
+  }): Token {
     return new Token(
-      TokenId.from(record.id),
-      SiteName.from(record.site),
-      record.name,
-      new Date(record.createdAt),
-      new Date(record.expiresAt),
+      props.id,
+      props.site,
+      props.name,
+      new Date(props.createdAt),
+      new Date(props.expiresAt),
     );
   }
 
@@ -119,16 +123,5 @@ export class Token {
   /** IDが同じなら同一のトークンとみなす */
   equals(other: Token): boolean {
     return this.id.equals(other.id);
-  }
-
-  /** HTTP・永続化の境界で使う値に変換する */
-  toRecord(): TokenRecord {
-    return {
-      id: this.id.value,
-      site: this.site.value,
-      name: this.#name,
-      createdAt: this.#createdAt.toISOString(),
-      expiresAt: this.#expiresAt.toISOString(),
-    };
   }
 }

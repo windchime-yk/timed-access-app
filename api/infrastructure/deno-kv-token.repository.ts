@@ -1,8 +1,12 @@
-import type { TokenRecord } from "../../shared/mod.ts";
 import type { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import type { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
-import { Token } from "../domain/aggregates/token/token.ts";
+import type { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
+import {
+  fromStoredToken,
+  type StoredToken,
+  toStoredToken,
+} from "./stored-token.mapper.ts";
 
 const KEY_PREFIX = "tokens";
 
@@ -19,25 +23,25 @@ export class DenoKvTokenRepository implements TokenRepository {
     const expireIn = token.expiresAt.getTime() - Date.now();
     await this.#kv.set(
       [KEY_PREFIX, token.site.value, token.id.value],
-      token.toRecord(),
+      toStoredToken(token),
       expireIn > 0 ? { expireIn } : undefined,
     );
   }
 
   async get(site: SiteName, id: TokenId): Promise<Token | null> {
-    const entry = await this.#kv.get<TokenRecord>([
+    const entry = await this.#kv.get<StoredToken>([
       KEY_PREFIX,
       site.value,
       id.value,
     ]);
-    return entry.value === null ? null : Token.restore(entry.value);
+    return entry.value === null ? null : fromStoredToken(entry.value);
   }
 
   async list(site?: SiteName): Promise<Token[]> {
     const tokens: Token[] = [];
     const prefix = site === undefined ? [KEY_PREFIX] : [KEY_PREFIX, site.value];
-    for await (const entry of this.#kv.list<TokenRecord>({ prefix })) {
-      tokens.push(Token.restore(entry.value));
+    for await (const entry of this.#kv.list<StoredToken>({ prefix })) {
+      tokens.push(fromStoredToken(entry.value));
     }
     return tokens;
   }

@@ -1,18 +1,22 @@
-import type { TokenRecord } from "../../shared/mod.ts";
 import type { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import type { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
-import { Token } from "../domain/aggregates/token/token.ts";
+import type { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
+import {
+  fromStoredToken,
+  type StoredToken,
+  toStoredToken,
+} from "./stored-token.mapper.ts";
 
 /** プロセス内メモリにトークンを保持する永続化（テスト用。自動削除はしない） */
 export class InMemoryTokenRepository implements TokenRepository {
   // 保存後のEntityの変更が反映されないよう、値に変換して保持する
-  #records = new Map<string, TokenRecord>();
+  #records = new Map<string, StoredToken>();
 
   #keyOf = (site: string, id: string): string => JSON.stringify([site, id]);
 
   put(token: Token): Promise<void> {
-    const record = token.toRecord();
+    const record = toStoredToken(token);
     this.#records.set(this.#keyOf(record.site, record.id), record);
     return Promise.resolve();
   }
@@ -20,7 +24,7 @@ export class InMemoryTokenRepository implements TokenRepository {
   get(site: SiteName, id: TokenId): Promise<Token | null> {
     const record = this.#records.get(this.#keyOf(site.value, id.value));
     return Promise.resolve(
-      record === undefined ? null : Token.restore(record),
+      record === undefined ? null : fromStoredToken(record),
     );
   }
 
@@ -30,7 +34,7 @@ export class InMemoryTokenRepository implements TokenRepository {
       .sort((a, b) =>
         a.site === b.site ? compare(a.id, b.id) : compare(a.site, b.site)
       )
-      .map((record) => Token.restore(record));
+      .map((record) => fromStoredToken(record));
     return Promise.resolve(tokens);
   }
 
