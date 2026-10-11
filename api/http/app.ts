@@ -10,7 +10,7 @@ import {
 import { requireApiKey } from "./middleware/api-key.ts";
 import { rateLimit, type RateLimitOptions } from "./middleware/rate-limit.ts";
 import type { TokenService } from "../application/token.service.ts";
-import { SiteName } from "../domain/site-name.value-object.ts";
+import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 
 /**
  * リクエストボディをJSONとして解釈する

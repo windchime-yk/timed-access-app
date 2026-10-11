@@ -1,5 +1,5 @@
 import { monotonicUlid } from "@std/ulid";
-import { ValueObject } from "./value-object.ts";
+import { ValueObject } from "../../../shared/value-object.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 

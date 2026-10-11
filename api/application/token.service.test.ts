@@ -5,8 +5,8 @@ import {
   assertRejects,
 } from "@std/assert";
 import type { TokenRecord } from "../../shared/mod.ts";
-import { Token } from "../domain/token.entity.ts";
-import type { TokenRepository } from "../domain/token.repository.ts";
+import { Token } from "../domain/aggregates/token/token.ts";
+import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { TokenService } from "./token.service.ts";
 

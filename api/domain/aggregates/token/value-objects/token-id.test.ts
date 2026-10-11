@@ -1,5 +1,5 @@
 import { assertEquals, assertMatch, assertThrows } from "@std/assert";
-import { TokenId } from "./token-id.value-object.ts";
+import { TokenId } from "./token-id.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 

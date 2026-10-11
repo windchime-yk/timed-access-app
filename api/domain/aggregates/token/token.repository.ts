@@ -1,6 +1,6 @@
-import type { SiteName } from "./site-name.value-object.ts";
-import type { TokenId } from "./token-id.value-object.ts";
-import type { Token } from "./token.entity.ts";
+import type { SiteName } from "./value-objects/site-name.ts";
+import type { TokenId } from "./value-objects/token-id.ts";
+import type { Token } from "./token.ts";
 
 /**
  * トークンの永続化インターフェース

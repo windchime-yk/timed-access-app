@@ -1,5 +1,5 @@
-import { SITE_NAME_PATTERN } from "../../shared/mod.ts";
-import { ValueObject } from "./value-object.ts";
+import { SITE_NAME_PATTERN } from "../../../../../shared/mod.ts";
+import { ValueObject } from "../../../shared/value-object.ts";
 
 /** トークンが属するサイト名（英小文字・数字・ハイフン1〜64文字のスラッグ） */
 export class SiteName extends ValueObject<string> {

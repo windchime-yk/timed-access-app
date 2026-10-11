@@ -1,8 +1,8 @@
 import type { TokenRecord } from "../../shared/mod.ts";
-import type { SiteName } from "../domain/site-name.value-object.ts";
-import type { TokenId } from "../domain/token-id.value-object.ts";
-import { Token } from "../domain/token.entity.ts";
-import type { TokenRepository } from "../domain/token.repository.ts";
+import type { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
+import type { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
+import { Token } from "../domain/aggregates/token/token.ts";
+import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 
 const KEY_PREFIX = "tokens";
 

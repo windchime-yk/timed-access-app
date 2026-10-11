@@ -1,7 +1,7 @@
 import { assertEquals, assertMatch, assertThrows } from "@std/assert";
-import type { TokenRecord } from "../../shared/mod.ts";
-import { SiteName } from "./site-name.value-object.ts";
-import { Token } from "./token.entity.ts";
+import type { TokenRecord } from "../../../../shared/mod.ts";
+import { SiteName } from "./value-objects/site-name.ts";
+import { Token } from "./token.ts";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 

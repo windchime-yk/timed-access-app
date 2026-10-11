@@ -1,6 +1,6 @@
-import type { TokenRecord } from "../../shared/mod.ts";
-import { SiteName } from "./site-name.value-object.ts";
-import { TokenId } from "./token-id.value-object.ts";
+import type { TokenRecord } from "../../../../shared/mod.ts";
+import { SiteName } from "./value-objects/site-name.ts";
+import { TokenId } from "./value-objects/token-id.ts";
 
 /** 表示名が未指定・空のときに使う既定の表示名 */
 const DEFAULT_NAME = "無題のトークン";
@@ -18,7 +18,7 @@ const assertFutureExpiry = (expiresAt: Date, now: Date): void => {
   }
 };
 
-/** 時限式トークン。IDで同一性を判定し、状態の変更はメソッド経由に限る */
+/** 時限式トークン（Token Aggregateのルート）。IDで同一性を判定し、状態の変更はメソッド経由に限る */
 export class Token {
   readonly id: TokenId;
   readonly site: SiteName;

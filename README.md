@@ -22,17 +22,34 @@ Deno Workspaceで3つのパッケージを管理しています。
 
 `api/` は永続化先を差し替えられるよう、次の4層に分けています。
 
-| ディレクトリ          | 役割                                                                            |
-| --------------------- | ------------------------------------------------------------------------------- |
-| `api/domain/`         | Entity `Token`、値オブジェクト `SiteName` / `TokenId`、`TokenRepository` の定義 |
-| `api/application/`    | `TokenService`。発行・取得・更新・削除・検証の流れ                              |
-| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ）                       |
-| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                                      |
-| `api/main.ts`         | 各層を組み立ててサーバーを起動する                                              |
+| ディレクトリ          | 役割                                                      |
+| --------------------- | --------------------------------------------------------- |
+| `api/domain/`         | Aggregate・値オブジェクト・リポジトリのインターフェース   |
+| `api/application/`    | `TokenService`。発行・取得・更新・削除・検証の流れ        |
+| `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ） |
+| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                |
+| `api/main.ts`         | 各層を組み立ててサーバーを起動する                        |
+
+`api/domain/` はAggregate単位でディレクトリを分けています。
+
+```
+api/domain/
+  aggregates/
+    token/                  # Token Aggregate
+      token.ts              # ルートEntity
+      token.repository.ts   # Aggregate単位のリポジトリ（インターフェース）
+      value-objects/        # このAggregateで使う値オブジェクト
+        site-name.ts
+        token-id.ts
+  shared/
+    value-object.ts         # 値オブジェクトの基底クラス
+```
 
 - トークンのルール（失効日時は未来であること、表示名の既定値、失効の判定）は
-  Entity `Token` が持ち、状態の変更は `rename` / `changeExpiry`
+  ルートEntity `Token` が持ち、状態の変更は `rename` / `changeExpiry`
   などのメソッド経由に限ります
+- 値オブジェクトを複数のAggregateで使うようになったら、`domain/value-objects/`
+  へ移して共有します
 - サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
   ドメインに入ることはありません
 - APIの入出力（`TokenRecord`）との変換は、次の2箇所で行います

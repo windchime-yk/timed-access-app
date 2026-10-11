@@ -1,8 +1,8 @@
 import type { VerifyResult } from "../../shared/mod.ts";
-import { SiteName } from "../domain/site-name.value-object.ts";
-import { TokenId } from "../domain/token-id.value-object.ts";
-import { Token } from "../domain/token.entity.ts";
-import type { TokenRepository } from "../domain/token.repository.ts";
+import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
+import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
+import { Token } from "../domain/aggregates/token/token.ts";
+import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 
 /** 時限式トークンの発行・管理・検証を行うアプリケーションサービス */
 export class TokenService {
