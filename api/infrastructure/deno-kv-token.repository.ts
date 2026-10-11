@@ -19,13 +19,15 @@ export class DenoKvTokenRepository implements TokenRepository {
   }
 
   async put(token: Token): Promise<void> {
-    // 失効日時ちょうどにKVからも自動削除されるよう expireIn を設定
+    const key = [KEY_PREFIX, token.site.value, token.id.value];
     const expireIn = token.expiresAt.getTime() - Date.now();
-    await this.#kv.set(
-      [KEY_PREFIX, token.site.value, token.id.value],
-      toStoredToken(token),
-      expireIn > 0 ? { expireIn } : undefined,
-    );
+    // 既に失効しているなら期限なしで残さないよう、保存せずに既存の値も消す
+    if (expireIn <= 0) {
+      await this.#kv.delete(key);
+      return;
+    }
+    // 失効日時ちょうどにKVからも自動削除されるよう expireIn を設定
+    await this.#kv.set(key, toStoredToken(token), { expireIn });
   }
 
   async get(site: SiteName, id: TokenId): Promise<Token | null> {
