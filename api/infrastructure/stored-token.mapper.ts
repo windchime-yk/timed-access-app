@@ -1,6 +1,7 @@
 import { Token } from "../domain/aggregates/token/token.ts";
 import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
+import { CorruptedStoredTokenError } from "./corrupted-stored-token.error.ts";
 
 /**
  * 永続化先に保存するトークンの形
@@ -31,13 +32,21 @@ export const toStoredToken = (token: Token): StoredToken => ({
 /**
  * 保存形式からEntityを復元する
  * @param stored 保存されていた値
- * @throws {ValidationError} サイト名・IDが不正な場合
+ * @throws {CorruptedStoredTokenError} 保存されていた値から復元できない場合
  */
-export const fromStoredToken = (stored: StoredToken): Token =>
-  Token.restore({
-    id: TokenId.from(stored.id),
-    site: SiteName.from(stored.site),
-    name: stored.name,
-    createdAt: new Date(stored.createdAt),
-    expiresAt: new Date(stored.expiresAt),
-  });
+export const fromStoredToken = (stored: StoredToken): Token => {
+  try {
+    return Token.restore({
+      id: TokenId.from(stored.id),
+      site: SiteName.from(stored.site),
+      name: stored.name,
+      createdAt: new Date(stored.createdAt),
+      expiresAt: new Date(stored.expiresAt),
+    });
+  } catch (error) {
+    throw new CorruptedStoredTokenError(
+      `保存されていたトークンを復元できません: ${JSON.stringify(stored)}`,
+      { cause: error },
+    );
+  }
+};
