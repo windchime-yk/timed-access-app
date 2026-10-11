@@ -1,11 +1,15 @@
 import { assertEquals } from "@std/assert";
-import type { TokenRecord } from "../../shared/mod.ts";
 import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
 import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
 import { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
 import { DenoKvTokenRepository } from "./deno-kv-token.repository.ts";
 import { InMemoryTokenRepository } from "./memory-token.repository.ts";
+import {
+  fromStoredToken,
+  type StoredToken,
+  toStoredToken,
+} from "./stored-token.mapper.ts";
 
 /** 契約テストを流す実装。新しい実装はここに追加する */
 const implementations: {
@@ -27,7 +31,7 @@ const implementations: {
 ];
 
 const tokenOf = (site: string, id: string, expiresInMs = 60_000): Token =>
-  Token.restore({
+  fromStoredToken({
     id,
     site,
     name: `${site}/${id}`,
@@ -39,8 +43,8 @@ const site = (value: string) => SiteName.from(value);
 const id = (value: string) => TokenId.from(value);
 
 /** Entityを比較しやすい値に変換する（null はそのまま） */
-const recordOf = (token: Token | null): TokenRecord | null =>
-  token?.toRecord() ?? null;
+const recordOf = (token: Token | null): StoredToken | null =>
+  token === null ? null : toStoredToken(token);
 
 for (const { name, open } of implementations) {
   const withRepo = async (fn: (repo: TokenRepository) => Promise<void>) => {
@@ -59,7 +63,7 @@ for (const { name, open } of implementations) {
 
       const found = await repo.get(token.site, token.id);
       assertEquals(found instanceof Token, true);
-      assertEquals(recordOf(found), token.toRecord());
+      assertEquals(recordOf(found), toStoredToken(token));
       assertEquals(
         await repo.get(site("blog"), id("01ARZ3NDEKTSV4RRFFQ69G5FAW")),
         null,
@@ -76,15 +80,15 @@ for (const { name, open } of implementations) {
 
       assertEquals(
         recordOf(await repo.get(token.site, token.id)),
-        token.toRecord(),
+        toStoredToken(token),
       );
-      assertEquals((await repo.list()).map(recordOf), [token.toRecord()]);
+      assertEquals((await repo.list()).map(recordOf), [toStoredToken(token)]);
     }));
 
   Deno.test(`${name}: 保存後にEntityを変更しても保存済みの値は変わらない`, () =>
     withRepo(async (repo) => {
       const token = tokenOf("blog", "01ARZ3NDEKTSV4RRFFQ69G5FAV");
-      const saved = token.toRecord();
+      const saved = toStoredToken(token);
       await repo.put(token);
       token.rename("保存していない変更");
 
@@ -123,10 +127,10 @@ for (const { name, open } of implementations) {
       await repo.put(blog2);
 
       assertEquals((await repo.list(site("blog"))).map(recordOf), [
-        blog.toRecord(),
+        toStoredToken(blog),
       ]);
       assertEquals((await repo.list(site("blog-2"))).map(recordOf), [
-        blog2.toRecord(),
+        toStoredToken(blog2),
       ]);
       assertEquals(await repo.list(site("blo")), []);
     }));
@@ -138,7 +142,7 @@ for (const { name, open } of implementations) {
 
       assertEquals(
         recordOf(await repo.get(expired.site, expired.id)),
-        expired.toRecord(),
+        toStoredToken(expired),
       );
     }));
 }

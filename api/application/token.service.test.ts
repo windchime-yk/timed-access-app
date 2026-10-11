@@ -4,9 +4,10 @@ import {
   assertNotEquals,
   assertRejects,
 } from "@std/assert";
-import type { TokenRecord } from "../../shared/mod.ts";
 import { Token } from "../domain/aggregates/token/token.ts";
 import type { TokenRepository } from "../domain/aggregates/token/token.repository.ts";
+import { SiteName } from "../domain/aggregates/token/value-objects/site-name.ts";
+import { TokenId } from "../domain/aggregates/token/value-objects/token-id.ts";
 import { InMemoryTokenRepository } from "../infrastructure/memory-token.repository.ts";
 import { ValidationError } from "./errors.ts";
 import type { TokenDto } from "./token.dto.ts";
@@ -26,16 +27,16 @@ const withService = async (
 /** 失効済みトークンをリポジトリへ直接書き込む（自動削除を経由しない失効状態の再現） */
 const seedExpiredToken = async (
   repo: TokenRepository,
-): Promise<TokenRecord> => {
-  const expired: TokenRecord = {
-    id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    site: SITE,
+): Promise<{ id: string }> => {
+  const id = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  await repo.put(Token.restore({
+    id: TokenId.from(id),
+    site: SiteName.from(SITE),
     name: "期限切れ",
-    createdAt: new Date(Date.now() - 120_000).toISOString(),
-    expiresAt: new Date(Date.now() - 60_000).toISOString(),
-  };
-  await repo.put(Token.restore(expired));
-  return expired;
+    createdAt: new Date(Date.now() - 120_000),
+    expiresAt: new Date(Date.now() - 60_000),
+  }));
+  return { id };
 };
 
 Deno.test("create: ULIDと失効日時を持つトークンをサイト配下に発行する", () =>
