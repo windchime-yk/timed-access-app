@@ -27,8 +27,14 @@ Deno Workspaceで3つのパッケージを管理しています。
 | `api/domain/`         | Aggregate・値オブジェクト・リポジトリのインターフェース   |
 | `api/application/`    | `TokenService`。発行・取得・更新・削除・検証の流れ        |
 | `api/infrastructure/` | `TokenRepository` の実装（Deno KV、テスト用のインメモリ） |
-| `api/http/`           | Honoのルーティング・入力検証・ミドルウェア                |
+| `api/presentation/`   | Honoのルーティング・入力検証・ミドルウェア（HTTPの入口）  |
 | `api/main.ts`         | 各層を組み立ててサーバーを起動する                        |
+
+`presentation/` の構成:
+
+- 入口は今のところHTTPだけのため、直下にHonoのアプリを置いています
+- CLIやキューのコンシューマなど別の入口が増えたら、入口ごとにディレクトリを分けます
+  （例 `presentation/http/`、`presentation/cli/`）
 
 `api/domain/` はAggregate単位でディレクトリを分けています。
 
@@ -53,7 +59,7 @@ api/domain/
 - サイト名・IDは値オブジェクトの生成時に検証されるため、不正な値のまま
   ドメインに入ることはありません
 - APIの入出力（`TokenRecord`）との変換は、次の2箇所で行います
-  - http層：レスポンス時の `toRecord()`
+  - presentation層：レスポンス時の `toRecord()`
   - リポジトリの実装：保存時の `toRecord()`、読み込み時の `Token.restore()`
 
 新しい永続化先（Cloudflare KV / D1 など）を足すときは、`infrastructure/` に

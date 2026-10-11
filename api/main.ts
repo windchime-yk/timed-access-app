@@ -1,6 +1,6 @@
 import { TokenService } from "./application/token.service.ts";
-import { createApp } from "./http/app.ts";
 import { DenoKvTokenRepository } from "./infrastructure/deno-kv-token.repository.ts";
+import { createApp } from "./presentation/app.ts";
 
 /**
  * 環境変数を正の整数として読み、不正・未設定なら既定値を返す
